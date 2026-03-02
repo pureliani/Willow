@@ -3,6 +3,8 @@ pub mod call;
 pub mod cast;
 pub mod comp;
 pub mod r#const;
+pub mod phi;
 pub mod select;
 pub mod terminator;
 pub mod unary;
+pub mod union;

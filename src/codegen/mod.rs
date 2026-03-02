@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
-use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType};
-use inkwell::values::BasicValueEnum;
+use inkwell::types::{
+    BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, StructType,
+};
+use inkwell::values::{BasicValueEnum, PhiValue};
 
 use crate::globals::STRING_INTERNER;
 use crate::hir::types::checked_declaration::{CheckedDeclaration, CheckedParam, FnType};
@@ -81,8 +83,20 @@ impl<'ctx> CodeGenerator<'ctx> {
 
             Type::String => unimplemented!("Codegen for String not yet implemented"),
             Type::List(_) => unimplemented!("Codegen for List not yet implemented"),
-            Type::Struct(_) => unimplemented!("Codegen for Struct not yet implemented"),
-            Type::Union(_) => unimplemented!("Codegen for Union not yet implemented"),
+            Type::Struct(_) => Some(
+                self.context
+                    .ptr_type(inkwell::AddressSpace::default())
+                    .into(),
+            ),
+            Type::Union(_) => {
+                let tag_type = self.context.i16_type();
+                let payload_type = self.context.i64_type();
+                Some(
+                    self.context
+                        .struct_type(&[tag_type.into(), payload_type.into()], false)
+                        .into(),
+                )
+            }
             Type::Null => unimplemented!("Codegen for Type::Null not yet implemented"),
 
             Type::Fn(_) => Some(
@@ -126,6 +140,8 @@ impl<'ctx> CodeGenerator<'ctx> {
         self.fn_values.clear();
         self.fn_blocks.clear();
 
+        let mut phi_nodes: HashMap<ValueId, PhiValue<'ctx>> = HashMap::new();
+
         let entry_bb = self.context.append_basic_block(function, "entry");
         self.fn_blocks.insert(func.entry_block, entry_bb);
 
@@ -142,20 +158,19 @@ impl<'ctx> CodeGenerator<'ctx> {
         for param in &func.params {
             if self.lower_type(&param.ty).is_some() {
                 let llvm_val = function.get_nth_param(llvm_param_index).unwrap();
-
                 if let Some(val_id) = param.value_id {
                     // Set name for debugging IR
                     llvm_val.set_name(&STRING_INTERNER.resolve(param.identifier.name));
                     self.fn_values.insert(val_id, llvm_val);
                 }
-
                 llvm_param_index += 1;
             }
         }
 
         for (id, block) in &func.blocks {
-            let llvm_bb = self.fn_blocks.get(id).unwrap();
+            self.create_phis_for_block(block, &mut phi_nodes);
 
+            let llvm_bb = self.fn_blocks.get(id).unwrap();
             self.builder.position_at_end(*llvm_bb);
 
             for instr in &block.instructions {
@@ -167,7 +182,20 @@ impl<'ctx> CodeGenerator<'ctx> {
             }
         }
 
+        for block in func.blocks.values() {
+            self.resolve_phis_for_block(block, &phi_nodes);
+        }
+
         self.current_fn = None;
+    }
+
+    pub fn get_struct_layout(&self, fields: &[CheckedParam]) -> StructType<'ctx> {
+        let field_types: Vec<BasicTypeEnum> = fields
+            .iter()
+            .filter_map(|field| self.lower_type(&field.ty))
+            .collect();
+
+        self.context.struct_type(&field_types, false)
     }
 
     pub fn lower_fn_type(&self, fn_ty: &FnType) -> FunctionType<'ctx> {
@@ -290,10 +318,10 @@ impl<'ctx> CodeGenerator<'ctx> {
             Instruction::Cast(c) => self.emit_cast_instr(c),
             Instruction::Call(c) => self.emit_call(c),
             Instruction::Select(s) => self.emit_select(s),
+            Instruction::Union(u) => self.emit_union(u),
             Instruction::Struct(_) => {
                 unimplemented!("Struct instruction not implemented")
             }
-            Instruction::Union(_) => unimplemented!("Union instruction not implemented"),
             Instruction::List(_) => unimplemented!("List instruction not implemented"),
         }
     }
