@@ -6,6 +6,7 @@ pub mod r#const;
 pub mod list;
 pub mod phi;
 pub mod select;
+pub mod r#struct;
 pub mod terminator;
 pub mod unary;
 pub mod union;

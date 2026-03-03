@@ -68,7 +68,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                                 "item_ptr",
                             )
                             .unwrap();
-                        self.builder.build_store(item_ptr, val);
+                        self.builder.build_store(item_ptr, val).unwrap();
                     }
                 }
 
