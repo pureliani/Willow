@@ -7,7 +7,6 @@ use crate::{
         errors::{SemanticError, SemanticErrorKind},
         instructions::{CallInstr, Instruction, Terminator},
         types::checked_type::Type,
-        utils::check_assignable::check_assignable,
     },
 };
 
@@ -81,13 +80,14 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         left: ValueId,
         left_span: Span,
+        right_span: Span,
         produce_right: F,
     ) -> ValueId
     where
         F: FnOnce(&mut Self) -> ValueId,
     {
         let left_type = self.get_value_type(left);
-        if !check_assignable(left_type, &Type::Bool, false) {
+        if left_type != &Type::Bool {
             self.errors.push(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     expected: Type::Bool,
@@ -116,13 +116,13 @@ impl<'a> Builder<'a, InBlock> {
         let right_block = self.context.block_id;
 
         let right_type = self.get_value_type(right);
-        if !check_assignable(right_type, &Type::Bool, false) {
+        if right_type != &Type::Bool {
             self.errors.push(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     expected: Type::Bool,
                     received: right_type.clone(),
                 },
-                span: left_span.clone(),
+                span: right_span,
             });
         }
 
@@ -163,13 +163,14 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         left: ValueId,
         left_span: Span,
+        right_span: Span,
         produce_right: F,
     ) -> ValueId
     where
         F: FnOnce(&mut Self) -> ValueId,
     {
         let left_type = self.get_value_type(left);
-        if !check_assignable(left_type, &Type::Bool, false) {
+        if left_type != &Type::Bool {
             self.errors.push(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     expected: Type::Bool,
@@ -198,13 +199,13 @@ impl<'a> Builder<'a, InBlock> {
         let right_block = self.context.block_id;
 
         let right_type = self.get_value_type(right);
-        if !check_assignable(right_type, &Type::Bool, false) {
+        if right_type != &Type::Bool {
             self.errors.push(SemanticError {
                 kind: SemanticErrorKind::TypeMismatch {
                     expected: Type::Bool,
                     received: right_type.clone(),
                 },
-                span: left_span.clone(),
+                span: right_span,
             });
         }
 

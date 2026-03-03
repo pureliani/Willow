@@ -106,7 +106,7 @@ impl<'a> Builder<'a, InBlock> {
         let current_val = self.build_expr(left.clone());
         let current_ty = self.get_value_type(current_val).clone();
 
-        let variants = match current_ty.as_union_variants() {
+        let variants = match current_ty.get_union_variants() {
             Some(v) => v,
             None => {
                 return self.report_error_and_get_poison(SemanticError {
@@ -123,7 +123,7 @@ impl<'a> Builder<'a, InBlock> {
         };
         let target_type = check_type_annotation(&mut type_ctx, &ty);
 
-        if target_type.as_union_variants().is_some() {
+        if target_type.get_union_variants().is_some() {
             return self.report_error_and_get_poison(SemanticError {
                 kind: SemanticErrorKind::UnsupportedUnionNarrowing,
                 span: ty.span.clone(),

@@ -1,197 +1,165 @@
-use std::collections::HashSet;
-
-use crate::{
-    ast::{
-        expr::{Expr, ExprKind},
-        Span,
-    },
-    hir::{
-        errors::{SemanticError, SemanticErrorKind},
-        types::checked_type::Type,
-        utils::numeric::{get_numeric_type_rank, is_float, is_integer, is_signed},
-    },
+use crate::ast::Span;
+use crate::compile::interner::StringId;
+use crate::hir::errors::{SemanticError, SemanticErrorKind};
+use crate::hir::types::checked_type::Type;
+use crate::hir::utils::numeric::{
+    get_numeric_type_rank, is_float, is_integer, is_signed,
 };
 
-/// Checks if `expr` (with type `source`) can be assigned to `target`.
-///
-/// Unlike `check_assignable`, this function inspects the `Expr` structure.
-/// If the expression is a literal (Struct or List), it allows covariance (widening)
-/// for its fields/items recursively
-/// If the expression is not a literal (e.g, a variable), it falls back to
-/// `check_assignable` which enforces invariance for mutable types to prevent aliasing
-pub fn check_structural_assignability(expr: &Expr, source: &Type, target: &Type) -> bool {
-    if source == target {
-        return true;
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub enum Adjustment {
+    Identity,
 
-    if matches!(source, Type::Unknown | Type::Never) || matches!(target, Type::Unknown) {
-        return true;
-    }
+    SExt,   // Sign Extend
+    ZExt,   // Zero Extend
+    Trunc,  // Truncate
+    FExt,   // Float Extend
+    FTrunc, // Float Truncate
+    SIToF,  // Signed Int To Float
+    UIToF,  // Unsigned Int To Float
+    FToSI,  // Float To Signed Int
+    FToUI,  // Float To Unsigned Int
 
-    match (&expr.kind, source, target) {
-        (
-            ExprKind::Struct(expr_fields),
-            Type::Struct(s_fields),
-            Type::Struct(t_fields),
-        ) => {
-            if s_fields.len() != t_fields.len() {
-                return false;
-            }
+    WrapInUnion(usize),
+    ReTagUnion(Vec<(u64, u64)>),
 
-            for tf in t_fields {
-                // Find corresponding field in source type and expression
-                let sf = s_fields
-                    .iter()
-                    .find(|p| p.identifier.name == tf.identifier.name);
-                let ef = expr_fields
-                    .iter()
-                    .find(|(id, _)| id.name == tf.identifier.name);
-
-                match (sf, ef) {
-                    (Some(sf), Some((_, sub_expr))) => {
-                        // Recursively check with the sub-expression
-                        if !check_structural_assignability(sub_expr, &sf.ty, &tf.ty) {
-                            return false;
-                        }
-                    }
-                    _ => return false, // Field missing or mismatch
-                }
-            }
-            true
-        }
-        (ExprKind::List(items), Type::List(s_elem), Type::List(t_elem)) => {
-            for item in items {
-                if !check_structural_assignability(item, s_elem, t_elem) {
-                    return false;
-                }
-            }
-            true
-        }
-        // For non-literals (identifiers, calls, etc.), use strict invariance check
-        _ => check_assignable(source, target, false),
-    }
+    CoerceStruct {
+        field_adjustments: Vec<(StringId, Adjustment)>,
+    },
 }
 
-/// Checks if `source` can be assigned/cast to `target`
-///
-/// `is_explicit = false`: implicit conversions only (assignments, args, returns)
-///   - Numeric widening (i32 → i64, f32 → f64, integer → float)
-///   - Union coercion (i32 → i32 | string)
-///   - Struct/List covariance
-///
-/// `is_explicit = true`: adds explicit conversions (typecast `as`)
-///   - Numeric narrowing (i64 → i32, float → integer)
-///   - Union unwrapping (i32 | string → i32)
-pub fn check_assignable(source: &Type, target: &Type, is_explicit: bool) -> bool {
-    let mut seen = HashSet::new();
-    check_assignable_recursive(source, target, is_explicit, &mut seen)
-}
-
-fn check_assignable_recursive(
-    source: &Type,
+/// Computes the adjustment needed to convert `source_type` to `target_type`
+pub fn compute_type_adjustment(
+    source_type: &Type,
     target: &Type,
     is_explicit: bool,
-    seen: &mut HashSet<(Type, Type)>,
-) -> bool {
-    if source == target {
-        return true;
-    }
-
-    if matches!(source, Type::Never)
-        || matches!(target, Type::Unknown)
-        || matches!(source, Type::Unknown)
-    {
-        return true;
-    }
-
-    if !seen.insert((source.clone(), target.clone())) {
-        return true;
-    }
-
-    let result = match (source, target) {
-        // Literal Types
-        (Type::Literal(lit), _) => {
-            check_assignable_recursive(&lit.widen(), target, is_explicit, seen)
-        }
-
-        (Type::Union(s_variants), Type::Union(t_variants)) => {
-            s_variants.iter().all(|s| {
-                t_variants
-                    .iter()
-                    .any(|t| check_assignable_recursive(s, t, is_explicit, seen))
-            })
-        }
-        (Type::Union(s_variants), _) => s_variants
-            .iter()
-            .all(|s| check_assignable_recursive(s, target, is_explicit, seen)),
-        (_, Type::Union(t_variants)) => t_variants
-            .iter()
-            .any(|t| check_assignable_recursive(source, t, is_explicit, seen)),
-        (s, t) if is_integer(s) && is_integer(t) => {
-            let s_rank = get_numeric_type_rank(s).unwrap();
-            let t_rank = get_numeric_type_rank(t).unwrap();
-            is_explicit || t_rank > s_rank
-        }
-        (s, t) if is_float(s) && is_float(t) => {
-            let s_rank = get_numeric_type_rank(s).unwrap();
-            let t_rank = get_numeric_type_rank(t).unwrap();
-            is_explicit || t_rank > s_rank
-        }
-        (s, t) if is_integer(s) && is_float(t) => true,
-        (s, t) if is_float(s) && is_integer(t) => is_explicit,
-
-        (Type::Struct(s_fields), Type::Struct(t_fields)) => {
-            if s_fields.len() == t_fields.len() {
-                s_fields.iter().zip(t_fields.iter()).all(|(sf, tf)| {
-                    sf.identifier.name == tf.identifier.name
-                        && check_assignable_recursive(&sf.ty, &tf.ty, false, seen)
-                        && check_assignable_recursive(&tf.ty, &sf.ty, false, seen)
-                })
-            } else {
-                false
-            }
-        }
-
-        (Type::List(s_elem), Type::List(t_elem)) => {
-            check_assignable_recursive(s_elem, t_elem, false, seen)
-                && check_assignable_recursive(t_elem, s_elem, false, seen)
-        }
-        (Type::Fn(s_fn), Type::Fn(t_fn)) => {
-            if s_fn.params.len() == t_fn.params.len() {
-                let params_ok =
-                    s_fn.params.iter().zip(t_fn.params.iter()).all(|(sp, tp)| {
-                        check_assignable_recursive(&sp.ty, &tp.ty, false, seen)
-                            && check_assignable_recursive(&tp.ty, &sp.ty, false, seen)
-                    });
-                let return_ok = check_assignable_recursive(
-                    &s_fn.return_type,
-                    &t_fn.return_type,
-                    false,
-                    seen,
-                ) && check_assignable_recursive(
-                    &t_fn.return_type,
-                    &s_fn.return_type,
-                    false,
-                    seen,
-                );
-                params_ok && return_ok
-            } else {
-                false
-            }
-        }
-
-        _ => false,
+) -> Result<Adjustment, SemanticErrorKind> {
+    let source = if let Type::Literal(lit) = source_type {
+        lit.widen()
+    } else {
+        source_type
     };
 
-    seen.remove(&(source.clone(), target.clone()));
-    result
-}
+    if source == target {
+        return Ok(Adjustment::Identity);
+    }
 
-pub fn type_mismatch_error(source: &Type, target: &Type) -> SemanticErrorKind {
-    SemanticErrorKind::TypeMismatch {
+    if is_integer(&source) && is_integer(target) {
+        let s_rank = get_numeric_type_rank(&source).unwrap();
+        let t_rank = get_numeric_type_rank(target).unwrap();
+
+        if t_rank > s_rank {
+            return if is_signed(&source) {
+                Ok(Adjustment::SExt)
+            } else {
+                Ok(Adjustment::ZExt)
+            };
+        } else if t_rank < s_rank && is_explicit {
+            return Ok(Adjustment::Trunc);
+        }
+    }
+
+    if is_float(&source) && is_float(target) {
+        let s_rank = get_numeric_type_rank(&source).unwrap();
+        let t_rank = get_numeric_type_rank(target).unwrap();
+
+        if t_rank > s_rank {
+            return Ok(Adjustment::FExt);
+        } else if t_rank < s_rank && is_explicit {
+            return Ok(Adjustment::FTrunc);
+        }
+    }
+
+    if is_integer(&source) && is_float(target) {
+        return if is_signed(&source) {
+            Ok(Adjustment::SIToF)
+        } else {
+            Ok(Adjustment::UIToF)
+        };
+    }
+
+    if is_float(&source) && is_integer(target) && is_explicit {
+        return if is_signed(target) {
+            Ok(Adjustment::FToSI)
+        } else {
+            Ok(Adjustment::FToUI)
+        };
+    }
+
+    if let (Some(source_variants), Some(target_variants)) =
+        (source.get_union_variants(), target.get_union_variants())
+    {
+        let mut mapping = Vec::new();
+        let mut all_mapped = true;
+
+        for (old_idx, sv) in source_variants.iter().enumerate() {
+            if let Some(new_idx) = target_variants.iter().position(|tv| sv == tv) {
+                mapping.push((old_idx as u64, new_idx as u64));
+            } else {
+                all_mapped = false;
+                break;
+            }
+        }
+
+        if all_mapped {
+            return Ok(Adjustment::ReTagUnion(mapping));
+        }
+    }
+
+    if let Some(target_variants) = target.get_union_variants() {
+        if let Some(idx) = target_variants.iter().position(|v| v == source) {
+            return Ok(Adjustment::WrapInUnion(idx));
+        }
+    }
+
+    if let (Type::Struct(s_fields), Type::Struct(t_fields)) = (&source, target) {
+        if !is_explicit {
+            return Err(SemanticErrorKind::TypeMismatch {
+                expected: target.clone(),
+                received: source.clone(),
+            });
+        }
+
+        if s_fields.len() == t_fields.len() {
+            let mut field_adjustments = Vec::new();
+            let mut possible = true;
+
+            for (sf, tf) in s_fields.iter().zip(t_fields.iter()) {
+                if sf.identifier.name != tf.identifier.name {
+                    possible = false;
+                    break;
+                }
+
+                if sf.ty == tf.ty {
+                    continue;
+                }
+
+                match compute_type_adjustment(&sf.ty, &tf.ty, is_explicit) {
+                    Ok(adj) => {
+                        if adj != Adjustment::Identity {
+                            field_adjustments.push((sf.identifier.name, adj));
+                        }
+                    }
+                    Err(_) => {
+                        possible = false;
+                        break;
+                    }
+                }
+            }
+
+            if possible {
+                if field_adjustments.is_empty() {
+                    return Ok(Adjustment::Identity);
+                }
+                return Ok(Adjustment::CoerceStruct { field_adjustments });
+            }
+        }
+    }
+
+    Err(SemanticErrorKind::TypeMismatch {
         expected: target.clone(),
         received: source.clone(),
-    }
+    })
 }
 
 pub fn arithmetic_supertype(

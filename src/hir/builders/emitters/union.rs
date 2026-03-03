@@ -14,7 +14,7 @@ impl<'a> Builder<'a, InBlock> {
     ) -> ValueId {
         let union_type = self.get_value_type(union_value);
         let variants = union_type
-            .as_union_variants()
+            .get_union_variants()
             .expect("INTERNAL COMPILER ERROR: test_variant called with non-union");
 
         assert!(

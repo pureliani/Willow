@@ -76,7 +76,7 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let union_val = self.get_val_strict(*src).into_struct_value();
                 let union_ty = self.program.value_types.get(src).unwrap();
 
-                let variants = union_ty.as_union_variants().unwrap();
+                let variants = union_ty.get_union_variants().unwrap();
                 let expected_tag = variants
                     .iter()
                     .position(|t| t == variant_type)
@@ -110,10 +110,10 @@ impl<'ctx> CodeGenerator<'ctx> {
                 let dest_ty = self.program.value_types.get(dest).unwrap();
 
                 let src_variants = src_ty
-                    .as_union_variants()
+                    .get_union_variants()
                     .expect("INTERNAL COMPILER ERROR: Widen/Narrow src is not a union");
                 let dest_variants = dest_ty
-                    .as_union_variants()
+                    .get_union_variants()
                     .expect("INTERNAL COMPILER ERROR: Widen/Narrow dest is not a union");
 
                 let old_tag = self

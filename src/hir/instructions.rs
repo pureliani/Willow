@@ -6,6 +6,7 @@ use crate::{
     hir::{
         builders::{BasicBlockId, ConstantId, ValueId},
         types::checked_type::Type,
+        utils::check_assignable::Adjustment,
     },
     tokenize::NumberKind,
 };
@@ -181,6 +182,7 @@ pub enum ListInstr {
 pub struct CastInstr {
     pub src: ValueId,
     pub dest: ValueId,
+    pub op: Adjustment,
 }
 
 #[derive(Clone, Debug)]

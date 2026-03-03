@@ -16,23 +16,23 @@ pub enum LiteralType {
 }
 
 impl LiteralType {
-    pub fn widen(&self) -> Type {
+    pub fn widen<'a>(&'a self) -> &'a Type {
         match self {
-            LiteralType::Bool(_) => Type::Bool,
-            LiteralType::String(_) => Type::String,
+            LiteralType::Bool(_) => &Type::Bool,
+            LiteralType::String(_) => &Type::String,
             LiteralType::Number(n) => match n.0 {
-                NumberKind::I64(_) => Type::I64,
-                NumberKind::I32(_) => Type::I32,
-                NumberKind::I16(_) => Type::I16,
-                NumberKind::I8(_) => Type::I8,
-                NumberKind::U64(_) => Type::U64,
-                NumberKind::U32(_) => Type::U32,
-                NumberKind::U16(_) => Type::U16,
-                NumberKind::U8(_) => Type::U8,
-                NumberKind::F64(_) => Type::F64,
-                NumberKind::F32(_) => Type::F32,
-                NumberKind::ISize(_) => Type::ISize,
-                NumberKind::USize(_) => Type::USize,
+                NumberKind::I64(_) => &Type::I64,
+                NumberKind::I32(_) => &Type::I32,
+                NumberKind::I16(_) => &Type::I16,
+                NumberKind::I8(_) => &Type::I8,
+                NumberKind::U64(_) => &Type::U64,
+                NumberKind::U32(_) => &Type::U32,
+                NumberKind::U16(_) => &Type::U16,
+                NumberKind::U8(_) => &Type::U8,
+                NumberKind::F64(_) => &Type::F64,
+                NumberKind::F32(_) => &Type::F32,
+                NumberKind::ISize(_) => &Type::ISize,
+                NumberKind::USize(_) => &Type::USize,
             },
         }
     }
@@ -125,7 +125,7 @@ impl Type {
         BTreeSet::from([self])
     }
 
-    pub fn as_union_variants(&self) -> Option<&BTreeSet<Type>> {
+    pub fn get_union_variants(&self) -> Option<&BTreeSet<Type>> {
         match self {
             Type::Union(variants) => Some(variants),
             _ => None,

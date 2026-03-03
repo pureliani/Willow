@@ -5,10 +5,7 @@ use crate::{
         errors::{SemanticError, SemanticErrorKind},
         instructions::{Instruction, ListInstr},
         types::checked_type::Type,
-        utils::{
-            check_assignable::check_assignable, numeric::is_integer,
-            points_to::PathSegment,
-        },
+        utils::{numeric::is_integer, points_to::PathSegment},
     },
 };
 
@@ -96,7 +93,7 @@ impl<'a> Builder<'a, InBlock> {
 
         match list_type {
             Type::List(inner) => {
-                if !check_assignable(&value_type, &inner, false) {
+                if value_type != *inner {
                     return self.report_error_and_get_poison(SemanticError {
                         kind: SemanticErrorKind::TypeMismatch {
                             expected: *inner,

@@ -4,7 +4,7 @@ use crate::{
         builders::{Builder, InBlock},
         errors::{SemanticError, SemanticErrorKind},
         types::checked_declaration::CheckedDeclaration,
-        utils::check_assignable::check_assignable,
+        utils::check_assignable::compute_type_adjustment,
     },
 };
 
@@ -26,17 +26,18 @@ impl<'a> Builder<'a, InBlock> {
         let val_id = self.build_expr(value);
         let actual_type = self.get_value_type(val_id).clone();
 
-        if !check_assignable(&actual_type, &expected_return_type, false) {
-            self.errors.push(SemanticError {
-                kind: SemanticErrorKind::ReturnTypeMismatch {
-                    expected: expected_return_type,
-                    received: actual_type,
-                },
-                span: value_span,
-            });
-            return;
-        }
+        let adjusted_val_id =
+            match compute_type_adjustment(&actual_type, &expected_return_type, false) {
+                Ok(adj) => self.apply_adjustment(val_id, adj, expected_return_type),
+                Err(_) => self.report_error_and_get_poison(SemanticError {
+                    kind: SemanticErrorKind::ReturnTypeMismatch {
+                        expected: expected_return_type,
+                        received: actual_type,
+                    },
+                    span: value_span,
+                }),
+            };
 
-        self.emit_return(val_id);
+        self.emit_return(adjusted_val_id);
     }
 }
