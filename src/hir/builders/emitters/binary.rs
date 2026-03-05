@@ -4,9 +4,7 @@ use crate::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
         instructions::{BinaryInstr, Instruction},
-        utils::check_assignable::{
-            arithmetic_supertype, compute_type_adjustment, Adjustment,
-        },
+        utils::check_assignable::{arithmetic_supertype, compute_type_adjustment},
     },
 };
 
@@ -19,36 +17,49 @@ impl<'a> Builder<'a, InBlock> {
         rhs_span: Span,
         op: OP,
     ) -> ValueId {
-        let lhs_type = self.get_value_type(lhs);
-        let rhs_type = self.get_value_type(rhs);
+        let lhs_type = self.get_value_type(lhs).clone();
+        let rhs_type = self.get_value_type(rhs).clone();
 
         let result_type = match arithmetic_supertype(
-            lhs_type,
+            &lhs_type,
             lhs_span.clone(),
-            rhs_type,
+            &rhs_type,
             rhs_span.clone(),
         ) {
             Ok(t) => t,
             Err(e) => return self.report_error_and_get_poison(e),
         };
 
-        let left_adjustment = compute_type_adjustment(lhs_type, &result_type, false);
-        let right_adjustment = compute_type_adjustment(rhs_type, &result_type, false);
-
-        let adjusted_left = match left_adjustment {
-            Ok(adj) => self.apply_adjustment(lhs, adj, result_type),
+        let left_adjustment = compute_type_adjustment(&lhs_type, &result_type, false);
+        let adjusted_lhs = match left_adjustment {
+            Ok(adj) => self.apply_adjustment(lhs, adj, result_type.clone()),
             Err(_) => {
                 return self.report_error_and_get_poison(SemanticError {
                     kind: SemanticErrorKind::TypeMismatch {
                         expected: result_type,
-                        received: (),
+                        received: lhs_type.clone(),
                     },
+                    span: lhs_span,
+                })
+            }
+        };
+
+        let right_adjustment = compute_type_adjustment(&rhs_type, &result_type, false);
+        let adjusted_rhs = match right_adjustment {
+            Ok(adj) => self.apply_adjustment(rhs, adj, result_type.clone()),
+            Err(_) => {
+                return self.report_error_and_get_poison(SemanticError {
+                    kind: SemanticErrorKind::TypeMismatch {
+                        expected: result_type.clone(),
+                        received: rhs_type.clone(),
+                    },
+                    span: rhs_span,
                 })
             }
         };
 
         let dest = self.new_value_id(result_type);
-        let binary_instr = op(dest, lhs, rhs);
+        let binary_instr = op(dest, adjusted_lhs, adjusted_rhs);
 
         self.push_instruction(Instruction::Binary(binary_instr));
         dest

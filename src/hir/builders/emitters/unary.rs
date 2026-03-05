@@ -1,7 +1,7 @@
 use crate::{
     ast::Span,
     hir::{
-        builders::{Builder, InBlock, ValueId},
+        builders::{Builder, InBlock, TypePredicate, ValueId},
         errors::{SemanticError, SemanticErrorKind},
         instructions::{Instruction, UnaryInstr},
         types::checked_type::Type,
@@ -39,6 +39,20 @@ impl<'a> Builder<'a, InBlock> {
         }
 
         let dest = self.new_value_id(Type::Bool);
+
+        if let Some(preds) = self.type_predicates.get(&src).cloned() {
+            let flipped: Vec<TypePredicate> = preds
+                .into_iter()
+                .map(|pred| TypePredicate {
+                    decl_id: pred.decl_id,
+                    on_true_type: pred.on_false_type,
+                    on_false_type: pred.on_true_type,
+                })
+                .collect();
+
+            self.type_predicates.insert(dest, flipped);
+        }
+
         self.push_instruction(Instruction::Unary(UnaryInstr::Not { dest, src }));
         dest
     }

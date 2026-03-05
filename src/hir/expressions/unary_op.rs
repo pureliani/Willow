@@ -1,7 +1,7 @@
 use crate::{
     ast::expr::Expr,
     hir::{
-        builders::{Builder, InBlock, TypePredicate, ValueId},
+        builders::{Builder, InBlock, ValueId},
         types::checked_type::{SpannedType, Type},
     },
 };
@@ -19,20 +19,6 @@ impl<'a> Builder<'a, InBlock> {
         };
         let operand_id = self.build_expr(right, Some(&expected_right_type));
         let result_id = self.emit_not(operand_id, right_span.clone());
-
-        if let Some(preds) = self.type_predicates.get(&operand_id).cloned() {
-            let flipped: Vec<TypePredicate> = preds
-                .into_iter()
-                .map(|pred| TypePredicate {
-                    decl_id: pred.decl_id,
-                    on_true_type: pred.on_false_type,
-                    on_false_type: pred.on_true_type,
-                })
-                .collect();
-
-            self.type_predicates.insert(result_id, flipped);
-        }
-
         self.check_expected(result_id, right_span, expected_type)
     }
 
