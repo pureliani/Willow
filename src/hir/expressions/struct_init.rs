@@ -31,7 +31,10 @@ impl<'a> Builder<'a, InBlock> {
                 });
             }
 
-            let val_id = self.build_expr(field_expr, None);
+            let expected_field_type = expected_type
+                .and_then(|et| et.kind.get_field(&field_name.name).map(|(_, ty)| ty));
+
+            let val_id = self.build_expr(field_expr, expected_field_type);
             field_values.push((field_name, val_id));
         }
 

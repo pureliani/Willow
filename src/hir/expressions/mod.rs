@@ -9,6 +9,7 @@ pub mod identifier;
 pub mod r#if;
 pub mod is_type;
 pub mod list_literal;
+pub mod null;
 pub mod number;
 pub mod or;
 pub mod static_access;
@@ -145,7 +146,7 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::IsType { left, ty } => {
                 self.build_is_type_expr(*left, ty, expected_type)
             }
-            ExprKind::Null => self.emit_const_null(),
+            ExprKind::Null => self.build_null_expr(span, expected_type),
         };
 
         self.check_expected(result, expr.span, expected_type)
