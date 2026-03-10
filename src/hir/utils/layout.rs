@@ -42,11 +42,11 @@ pub fn get_layout_of(ty: &Type) -> Layout {
             calculate_fields_layout(&field_types)
         }
 
-        Type::Union(variants) => {
+        Type::Union { base, .. } => {
             let mut max_size = 0;
             let mut max_align = 1;
 
-            for v in variants {
+            for v in base {
                 let layout = get_layout_of(v);
                 max_size = max_size.max(layout.size);
                 max_align = max_align.max(layout.alignment);

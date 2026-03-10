@@ -1,34 +1,42 @@
 error[S10]: Type mismatch
-  ┌─ /home/gabriel/Desktop/Lilac/code.li:5:24
+  ┌─ /home/gabriel/Desktop/Lilac/code.li:9:24
   │
 1 │ 
 2 │ type Arg = { value: string | i32 };
 3 │ 
-4 │ fn main() {
-5 │     let x = if 1 > 2 { 1 } else { "hello" };
+4 │ fn get_number(): i32 {
+5 │     // no final expression
+6 │ }
+7 │ 
+8 │ fn main() {
+9 │     let x = if 1 > 2 { 1 } else { "hello" };
   │                        ^
   │                        │
   │                        Expected `1i32 | hello`, found `1i32`
-6 │ 
-7 │ 
-8 │ 
-9 │ }
 10 │ 
+11 │ 
+12 │ 
+13 │ }
+14 │ 
 
 error[S10]: Type mismatch
-  ┌─ /home/gabriel/Desktop/Lilac/code.li:5:35
+  ┌─ /home/gabriel/Desktop/Lilac/code.li:9:35
   │
 1 │ 
 2 │ type Arg = { value: string | i32 };
 3 │ 
-4 │ fn main() {
-5 │     let x = if 1 > 2 { 1 } else { "hello" };
+4 │ fn get_number(): i32 {
+5 │     // no final expression
+6 │ }
+7 │ 
+8 │ fn main() {
+9 │     let x = if 1 > 2 { 1 } else { "hello" };
   │                                   ^^^^^^^
   │                                   │
   │                                   Expected `1i32 | hello`, found `hello`
-6 │ 
-7 │ 
-8 │ 
-9 │ }
 10 │ 
+11 │ 
+12 │ 
+13 │ }
+14 │ 
 

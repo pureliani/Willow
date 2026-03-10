@@ -3,7 +3,7 @@ use crate::{
     hir::{
         builders::{Builder, InBlock, ValueId},
         types::checked_type::{SpannedType, Type},
-        utils::check_assignable::compute_type_adjustment,
+        utils::adjustment::compute_type_adjustment,
     },
 };
 

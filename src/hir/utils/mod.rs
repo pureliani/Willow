@@ -1,4 +1,4 @@
-pub mod check_assignable;
+pub mod adjustment;
 pub mod check_type;
 pub mod dump;
 pub mod get_poison;

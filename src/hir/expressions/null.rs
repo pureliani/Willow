@@ -13,10 +13,10 @@ impl<'a> Builder<'a, InBlock> {
         expected_type: Option<&SpannedType>,
     ) -> ValueId {
         if let Some(et) = expected_type {
-            if let Some(variants) = et.kind.get_union_variants() {
+            if let Some(variants) = et.kind.get_narrowed_variants() {
                 if variants.contains(&Type::Null) {
                     let val = self.emit_const_null();
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
             }
         }

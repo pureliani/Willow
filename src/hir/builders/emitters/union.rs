@@ -1,25 +1,27 @@
-use std::collections::BTreeSet;
-
 use crate::hir::{
     builders::{Builder, InBlock, ValueId},
     instructions::{CastInstr, Instruction, UnionInstr},
     types::checked_type::Type,
-    utils::check_assignable::Adjustment,
+    utils::adjustment::Adjustment,
 };
 
 impl<'a> Builder<'a, InBlock> {
     pub fn emit_wrap_in_union(
         &mut self,
         source: ValueId,
-        variants: &BTreeSet<Type>,
+        target_type: &Type, 
     ) -> ValueId {
         let source_type = self.get_value_type(source).clone();
 
-        let variant_index = variants.iter().position(|v| v == &source_type).expect(
-            "INTERNAL COMPILER ERROR: wrap_in_union - source type is not a variant",
+        let base_variants = target_type.get_base_variants().expect(
+            "INTERNAL COMPILER ERROR: wrap_in_union - target is not a union",
         );
 
-        let new_union_value = self.new_value_id(Type::Union(variants.clone()));
+        let variant_index = base_variants.iter().position(|v| v == &source_type).expect(
+            "INTERNAL COMPILER ERROR: wrap_in_union - source type is not a variant in the base",
+        );
+
+        let new_union_value = self.new_value_id(target_type.clone());
 
         self.push_instruction(Instruction::Cast(CastInstr {
             src: source,
@@ -29,6 +31,7 @@ impl<'a> Builder<'a, InBlock> {
 
         new_union_value
     }
+    
     /// Runtime safety: The caller must ensure that at runtime the union holds a value
     /// of type `variant_type`
     pub fn emit_unwrap_from_union(
@@ -38,7 +41,7 @@ impl<'a> Builder<'a, InBlock> {
     ) -> ValueId {
         let union_value_ty = self.get_value_type(union_value);
 
-        let variants = union_value_ty.get_union_variants().expect(
+        let variants = union_value_ty.get_narrowed_variants().expect(
             "INTERNAL COMPILER ERROR: unwrap_from_union - union_value is not a union",
         );
 
@@ -65,7 +68,7 @@ impl<'a> Builder<'a, InBlock> {
     ) -> ValueId {
         let union_type = self.get_value_type(union_value);
         let variants = union_type
-            .get_union_variants()
+            .get_narrowed_variants()
             .expect("INTERNAL COMPILER ERROR: test_variant called with non-union");
 
         assert!(
@@ -85,63 +88,65 @@ impl<'a> Builder<'a, InBlock> {
     pub fn emit_widen_union(
         &mut self,
         union: ValueId,
-        target_variants: &BTreeSet<Type>,
+        target_type: &Type,
     ) -> ValueId {
-        let source_variants = match self.get_value_type(union) {
-            Type::Union(variants) => variants,
-            _ => panic!("INTERNAL COMPILER ERROR: widen_union called on non-union type"),
-        };
+        let dest = self.new_value_id(target_type.clone());
+        let source_type = self.get_value_type(union);
 
-        assert!(source_variants.len() <= target_variants.len());
+        let source_base = source_type.get_base_variants().expect("Expected union");
+        let target_base = target_type.get_base_variants().expect("Expected union");
 
-        let mut mapping = Vec::new();
-        for (old_idx, sv) in source_variants.iter().enumerate() {
-            let new_idx = target_variants.iter().position(|tv| sv == tv).expect(
-                "INTERNAL COMPILER ERROR: widen_union - variant missing in target",
-            );
 
-            mapping.push((old_idx as u64, new_idx as u64));
+        if source_base == target_base {
+            self.push_instruction(Instruction::Cast(CastInstr {
+                src: union,
+                dest,
+                op: Adjustment::Identity,
+            }));
+        } else {
+            let mut mapping = Vec::new();
+            
+            for (old_idx, sv) in source_base.iter().enumerate() {
+                let new_idx = target_base.iter().position(|tv| sv == tv).expect(
+                    "INTERNAL COMPILER ERROR: widen_union - variant missing in target base",
+                );
+
+                mapping.push((old_idx as u64, new_idx as u64));
+            }
+
+            self.push_instruction(Instruction::Cast(CastInstr {
+                src: union,
+                dest,
+                op: Adjustment::ReTagUnion(mapping),
+            }));
         }
-
-        let dest = self.new_value_id(Type::Union(target_variants.clone()));
-
-        self.push_instruction(Instruction::Cast(CastInstr {
-            src: union,
-            dest,
-            op: Adjustment::ReTagUnion(mapping),
-        }));
 
         dest
     }
 
     /// Runtime safety: The caller must ensure that at runtime the union
-    /// holds a variant that exists in `target_variants`
+    /// holds a variant that exists in `target_type`
     pub fn emit_narrow_union(
         &mut self,
         union: ValueId,
-        target_variants: &BTreeSet<Type>,
+        target_type: &Type,
     ) -> ValueId {
-        let source_variants = match self.get_value_type(union) {
-            Type::Union(variants) => variants,
-            _ => panic!("INTERNAL COMPILER ERROR: narrow_union called on non-union type"),
-        };
+        let source_type = self.get_value_type(union);
 
-        assert!(source_variants.len() > target_variants.len());
+        let source_base = source_type.get_base_variants().expect("Expected union");
+        let target_base = target_type.get_base_variants().expect("Expected union");
+        
+        assert_eq!(
+            source_base, target_base, 
+            "INTERNAL COMPILER ERROR: Cannot narrow to a union with a different physical base"
+        );
 
-        let mut mapping = Vec::new();
-
-        for (old_idx, sv) in source_variants.iter().enumerate() {
-            if let Some(new_idx) = target_variants.iter().position(|tv| sv == tv) {
-                mapping.push((old_idx as u64, new_idx as u64));
-            }
-        }
-
-        let dest = self.new_value_id(Type::Union(target_variants.clone()));
+        let dest = self.new_value_id(target_type.clone());
 
         self.push_instruction(Instruction::Cast(CastInstr {
             src: union,
             dest,
-            op: Adjustment::ReTagUnion(mapping),
+            op: Adjustment::Identity, 
         }));
 
         dest

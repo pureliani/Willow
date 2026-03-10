@@ -114,7 +114,7 @@ impl<'a> Builder<'a, InBlock> {
         let current_val = self.build_expr(left.clone(), None);
         let current_ty = self.get_value_type(current_val).clone();
 
-        let variants = match current_ty.get_union_variants() {
+        let source_variants = match current_ty.get_narrowed_variants() {
             Some(v) => v,
             None => {
                 return self.report_error_and_get_poison(SemanticError {
@@ -131,7 +131,7 @@ impl<'a> Builder<'a, InBlock> {
         };
         let target_type = check_type_annotation(&mut type_ctx, &ty);
 
-        if target_type.kind.get_union_variants().is_some() {
+        if target_type.kind.get_narrowed_variants().is_some() {
             return self.report_error_and_get_poison(SemanticError {
                 kind: SemanticErrorKind::UnsupportedUnionNarrowing,
                 span: ty.span.clone(),
@@ -141,7 +141,7 @@ impl<'a> Builder<'a, InBlock> {
         let mut matching_variants = Vec::new();
         let mut non_matching_variants = Vec::new();
 
-        for variant in variants {
+        for variant in source_variants {
             if variant == &target_type.kind {
                 matching_variants.push(variant.clone());
             } else {
@@ -152,22 +152,30 @@ impl<'a> Builder<'a, InBlock> {
         let result_id = self.emit_is_one_of_the_variants(
             current_val,
             &matching_variants,
-            variants.len(),
+            source_variants.len(),
             span.clone(),
         );
 
+        let base_variants = current_ty.get_base_variants().unwrap();
+
         let true_type = if !matching_variants.is_empty()
-            && matching_variants.len() < variants.len()
+            && matching_variants.len() < source_variants.len()
         {
-            Some(Type::make_union(matching_variants))
+            Some(Type::Union {
+                base: base_variants.clone(),
+                narrowed: matching_variants.into_iter().collect(),
+            })
         } else {
             None
         };
 
         let false_type = if !non_matching_variants.is_empty()
-            && non_matching_variants.len() < variants.len()
+            && non_matching_variants.len() < source_variants.len()
         {
-            Some(Type::make_union(non_matching_variants))
+            Some(Type::Union {
+                base: base_variants.clone(),
+                narrowed: non_matching_variants.into_iter().collect(),
+            })
         } else {
             None
         };

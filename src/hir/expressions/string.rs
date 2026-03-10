@@ -26,15 +26,15 @@ impl<'a> Builder<'a, InBlock> {
                 return self.emit_string(id);
             }
 
-            if let Some(variants) = et.kind.get_union_variants() {
+            if let Some(variants) = et.kind.get_narrowed_variants() {
                 if variants.contains(&literal) {
                     let val = self.emit_string_literal(id);
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
 
                 if variants.contains(&Type::String) {
                     let val = self.emit_string(id);
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
             }
         }

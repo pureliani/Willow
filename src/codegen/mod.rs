@@ -116,8 +116,8 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .ptr_type(inkwell::AddressSpace::default())
                     .into(),
             ),
-            Type::Union(variants) => {
-                let (layout, _) = self.get_union_layout(variants);
+            Type::Union { base, .. } => {
+                let (layout, _) = self.get_union_layout(base);
                 Some(BasicTypeEnum::StructType(layout))
             }
             Type::Unknown | Type::Never => {

@@ -199,7 +199,7 @@ impl<'ctx> CodeGenerator<'ctx> {
 
         let dest_ty = self.program.value_types.get(&dest).unwrap().clone();
         let variants = dest_ty
-            .get_union_variants()
+            .get_narrowed_variants()
             .expect("INTERNAL COMPILER ERROR: List Get dest must be a union");
 
         let list_ty = self.program.value_types.get(&list).unwrap();
@@ -240,7 +240,7 @@ impl<'ctx> CodeGenerator<'ctx> {
             |cg| {
                 let elem_val = cg.load_element_at(data_ptr, idx_val, elem_llvm_ty);
 
-                if let Some(elem_variants) = elem_ty.get_union_variants() {
+                if let Some(elem_variants) = elem_ty.get_narrowed_variants() {
                     let mut mapping: Vec<(u64, u64)> = Vec::new();
                     for (old_idx, sv) in elem_variants.iter().enumerate() {
                         let new_idx = cg.find_variant_tag(variants, sv);

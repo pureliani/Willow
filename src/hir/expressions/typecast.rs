@@ -5,7 +5,7 @@ use crate::{
         errors::{SemanticError, SemanticErrorKind},
         types::checked_type::SpannedType,
         utils::{
-            check_assignable::compute_type_adjustment,
+            adjustment::compute_type_adjustment,
             check_type::{check_type_annotation, TypeCheckerContext},
         },
     },

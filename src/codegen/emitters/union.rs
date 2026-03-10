@@ -38,11 +38,11 @@ impl<'ctx> CodeGenerator<'ctx> {
                     .into_struct_value();
                 let union_ty = self.program.value_types.get(src).unwrap();
 
-                let variants = union_ty.get_union_variants().unwrap();
-                let expected_tag = variants
+                let base_variants = union_ty.get_base_variants().unwrap();
+                let expected_tag = base_variants
                     .iter()
                     .position(|t| t == variant_type)
-                    .expect("Variant not found in union type");
+                    .expect("INTERNAL COMPILER ERROR: Variant not found in union type");
 
                 let actual_tag = self
                     .builder

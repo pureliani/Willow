@@ -98,29 +98,43 @@ pub fn compute_type_adjustment(
         };
     }
 
-    if let (Some(source_variants), Some(target_variants)) =
-        (source.get_union_variants(), target.get_union_variants())
-    {
-        let mut mapping = Vec::new();
-        let mut all_mapped = true;
+    if let Type::Union { narrowed, .. } = source {
+        if narrowed.len() == 1 && narrowed.contains(target) {
+            return Ok(Adjustment::UnwrapUnion);
+        }
+    }
 
-        for (old_idx, sv) in source_variants.iter().enumerate() {
-            if let Some(new_idx) = target_variants.iter().position(|tv| sv == tv) {
-                mapping.push((old_idx as u64, new_idx as u64));
-            } else {
+    if let (Some(source_narrowed), Some(target_narrowed)) = (
+        source.get_narrowed_variants(),
+        target.get_narrowed_variants(),
+    ) {
+        let mut all_mapped = true;
+        for sv in source_narrowed {
+            if !target_narrowed.contains(sv) {
                 all_mapped = false;
                 break;
             }
         }
 
         if all_mapped {
+            let source_base = source.get_base_variants().unwrap();
+            let target_base = target.get_base_variants().unwrap();
+            let mut mapping = Vec::new();
+
+            for (old_idx, sv) in source_base.iter().enumerate() {
+                if let Some(new_idx) = target_base.iter().position(|tv| sv == tv) {
+                    mapping.push((old_idx as u64, new_idx as u64));
+                }
+            }
             return Ok(Adjustment::ReTagUnion(mapping));
         }
     }
 
-    if let Some(target_variants) = target.get_union_variants() {
-        if let Some(idx) = target_variants.iter().position(|v| v == source) {
-            return Ok(Adjustment::WrapInUnion(idx));
+    if let Some(target_base) = target.get_base_variants() {
+        if let Some(idx) = target_base.iter().position(|v| v == source) {
+            if target.get_narrowed_variants().unwrap().contains(source) {
+                return Ok(Adjustment::WrapInUnion(idx));
+            }
         }
     }
 

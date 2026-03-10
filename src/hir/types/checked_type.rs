@@ -59,7 +59,10 @@ pub enum Type {
     Null,
     Literal(LiteralType),
     Struct(Vec<CheckedParam>),
-    Union(BTreeSet<Type>),
+    Union {
+        base: BTreeSet<Type>,
+        narrowed: BTreeSet<Type>,
+    },
     List(Box<SpannedType>),
     String,
     Fn(FnType),
@@ -86,26 +89,36 @@ impl Type {
     }
 
     pub fn make_union(types: impl IntoIterator<Item = Type>) -> Type {
-        let mut flat_set = BTreeSet::new();
+        let mut base = BTreeSet::new();
+        let mut narrowed = BTreeSet::new();
 
         for ty in types {
             if matches!(ty, Type::Never) {
                 continue;
             }
-
-            if let Type::Union(variants) = ty {
-                flat_set.extend(variants);
-                continue;
+            if let Type::Union {
+                base: b,
+                narrowed: n,
+            } = ty
+            {
+                base.extend(b);
+                narrowed.extend(n);
+            } else {
+                base.insert(ty.clone());
+                narrowed.insert(ty);
             }
-
-            flat_set.insert(ty);
         }
 
-        match flat_set.len() {
-            0 => Type::Never,
-            1 => flat_set.into_iter().next().unwrap(),
-            _ => Type::Union(flat_set),
+        if base.is_empty() {
+            return Type::Never;
         }
+
+        // CRITICAL: Only unwrap if the PHYSICAL variants collapse to 1.
+        if base.len() == 1 {
+            return base.into_iter().next().unwrap();
+        }
+
+        Type::Union { base, narrowed }
     }
 
     pub fn union(self, other: Type) -> Type {
@@ -135,18 +148,28 @@ impl Type {
         if matches!(self, Type::Never) {
             return BTreeSet::new();
         }
-
-        if let Type::Union(variants) = self {
-            return variants;
+        if let Type::Union { narrowed, .. } = self {
+            return narrowed;
         }
 
-        BTreeSet::from([self])
+        let mut set = BTreeSet::new();
+        set.insert(self);
+        set
     }
 
-    pub fn get_union_variants(&self) -> Option<&BTreeSet<Type>> {
-        match self {
-            Type::Union(variants) => Some(variants),
-            _ => None,
+    pub fn get_narrowed_variants(&self) -> Option<&BTreeSet<Type>> {
+        if let Type::Union { narrowed, .. } = self {
+            Some(narrowed)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_base_variants(&self) -> Option<&BTreeSet<Type>> {
+        if let Type::Union { base, .. } = self {
+            Some(base)
+        } else {
+            None
         }
     }
 

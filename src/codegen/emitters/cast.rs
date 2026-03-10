@@ -1,6 +1,6 @@
 use crate::{
     codegen::CodeGenerator,
-    hir::{instructions::CastInstr, utils::check_assignable::Adjustment},
+    hir::{instructions::CastInstr, utils::adjustment::Adjustment},
 };
 
 impl<'ctx> CodeGenerator<'ctx> {

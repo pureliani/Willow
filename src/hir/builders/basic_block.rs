@@ -12,7 +12,7 @@ use crate::{
         instructions::{CastInstr, Instruction, Terminator},
         types::{checked_declaration::CheckedDeclaration, checked_type::Type},
         utils::{
-            check_assignable::{compute_type_adjustment, Adjustment, AdjustmentError},
+            adjustment::{compute_type_adjustment, Adjustment, AdjustmentError},
             type_to_string::type_to_string,
         },
     },

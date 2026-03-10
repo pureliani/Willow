@@ -24,15 +24,15 @@ impl<'a> Builder<'a, InBlock> {
                 return self.emit_bool(value);
             }
 
-            if let Some(variants) = et.kind.get_union_variants() {
+            if let Some(variants) = et.kind.get_narrowed_variants() {
                 if variants.contains(&literal) {
                     let val = self.emit_bool_literal(value);
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
 
                 if variants.contains(&Type::Bool) {
                     let val = self.emit_bool(value);
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
             }
         }

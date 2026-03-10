@@ -65,15 +65,15 @@ impl<'a> Builder<'a, InBlock> {
                 return self.emit_number(widened_value);
             }
 
-            if let Some(variants) = et.kind.get_union_variants() {
+            if let Some(variants) = et.kind.get_narrowed_variants() {
                 if variants.contains(&literal) {
                     let val = self.emit_number_literal(value);
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
 
                 if variants.contains(&widened) {
                     let val = self.emit_number(value);
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
 
                 let widenable: Vec<&Type> = variants
@@ -84,7 +84,7 @@ impl<'a> Builder<'a, InBlock> {
                 if widenable.len() == 1 {
                     let widened_value = safely_widen(&value, widenable[0]).unwrap();
                     let val = self.emit_number(widened_value);
-                    return self.emit_wrap_in_union(val, variants);
+                    return self.emit_wrap_in_union(val, &et.kind);
                 }
             }
         }

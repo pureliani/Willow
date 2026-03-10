@@ -151,9 +151,9 @@ impl<'a> Builder<'a, InBlock> {
             return;
         }
 
-        let narrowed_val = if current_ty.get_union_variants().is_some() {
-            if let Some(target_variants) = new_type.get_union_variants() {
-                self.emit_narrow_union(current_val, target_variants)
+        let narrowed_val = if current_ty.get_narrowed_variants().is_some() {
+            if new_type.get_narrowed_variants().is_some() {
+                self.emit_narrow_union(current_val, &new_type)
             } else {
                 self.emit_unwrap_from_union(current_val, &new_type)
             }

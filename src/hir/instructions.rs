@@ -4,7 +4,7 @@ use crate::{
     hir::{
         builders::{BasicBlockId, ValueId},
         types::checked_type::Type,
-        utils::check_assignable::Adjustment,
+        utils::adjustment::Adjustment,
     },
     tokenize::NumberKind,
 };

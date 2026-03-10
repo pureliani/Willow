@@ -51,7 +51,7 @@ pub fn type_to_string_recursive(ty: &Type, visited_set: &mut HashSet<Type>) -> S
         Type::Literal(literal) => literal_to_string(literal),
         Type::Never => String::from("never"),
         Type::Struct(s) => struct_to_string(s, visited_set),
-        Type::Union(variants) => union_variants_to_string(variants, visited_set),
+        Type::Union { narrowed, .. } => union_variants_to_string(narrowed, visited_set),
         Type::Fn(fn_type) => fn_signature_to_string(fn_type, visited_set),
         Type::List(item_type) => list_to_string(&item_type.kind, visited_set),
     };

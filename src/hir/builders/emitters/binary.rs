@@ -4,7 +4,7 @@ use crate::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
         instructions::{BinaryInstr, Instruction},
-        utils::check_assignable::{arithmetic_supertype, compute_type_adjustment},
+        utils::adjustment::{arithmetic_supertype, compute_type_adjustment},
     },
 };
 
