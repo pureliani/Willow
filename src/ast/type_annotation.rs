@@ -20,6 +20,8 @@ pub enum TypeAnnotationKind {
     I64(Option<i64>),
     F32(Option<f32>),
     F64(Option<f64>),
+    ISize(Option<isize>),
+    USize(Option<usize>),
     String(Option<StringId>),
     Identifier(IdentifierNode),
     Struct(Vec<Param>),

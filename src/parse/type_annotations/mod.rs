@@ -9,7 +9,7 @@ use crate::{
         Span,
     },
     globals::STRING_INTERNER,
-    tokenize::{KeywordKind, PunctuationKind, TokenKind},
+    tokenize::{KeywordKind, NumberKind, PunctuationKind, TokenKind},
 };
 
 fn suffix_bp(token_kind: &TokenKind) -> Option<(u8, ())> {
@@ -60,7 +60,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::Bool)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::Bool,
+                    kind: TypeAnnotationKind::Bool(None),
                     span,
                 }
             }
@@ -69,7 +69,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::String)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::String,
+                    kind: TypeAnnotationKind::String(None),
                     span,
                 }
             }
@@ -79,7 +79,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::U8)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U8,
+                    kind: TypeAnnotationKind::U8(None),
                     span,
                 }
             }
@@ -89,7 +89,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::U16)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U16,
+                    kind: TypeAnnotationKind::U16(None),
                     span,
                 }
             }
@@ -99,7 +99,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::U32)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U32,
+                    kind: TypeAnnotationKind::U32(None),
                     span,
                 }
             }
@@ -109,7 +109,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::U64)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U64,
+                    kind: TypeAnnotationKind::U64(None),
                     span,
                 }
             }
@@ -119,7 +119,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::I8)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I8,
+                    kind: TypeAnnotationKind::I8(None),
                     span,
                 }
             }
@@ -129,7 +129,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::I16)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I16,
+                    kind: TypeAnnotationKind::I16(None),
                     span,
                 }
             }
@@ -139,7 +139,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::I32)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I32,
+                    kind: TypeAnnotationKind::I32(None),
                     span,
                 }
             }
@@ -149,7 +149,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::I64)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I64,
+                    kind: TypeAnnotationKind::I64(None),
                     span,
                 }
             }
@@ -159,7 +159,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::F32)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::F32,
+                    kind: TypeAnnotationKind::F32(None),
                     span,
                 }
             }
@@ -169,7 +169,7 @@ impl Parser {
                 self.consume_keyword(KeywordKind::F64)?;
                 let span = self.get_span(start_offset, self.offset - 1)?;
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::F64,
+                    kind: TypeAnnotationKind::F64(None),
                     span,
                 }
             }
@@ -183,11 +183,23 @@ impl Parser {
             }
             TokenKind::Number(num_kind) => {
                 let span = token.span.clone();
+                let type_kind = match num_kind {
+                    NumberKind::I64(lit) => TypeAnnotationKind::I64(Some(lit)),
+                    NumberKind::I32(lit) => TypeAnnotationKind::I32(Some(lit)),
+                    NumberKind::I16(lit) => TypeAnnotationKind::I16(Some(lit)),
+                    NumberKind::I8(lit) => TypeAnnotationKind::I8(Some(lit)),
+                    NumberKind::F32(lit) => TypeAnnotationKind::F32(Some(lit)),
+                    NumberKind::F64(lit) => TypeAnnotationKind::F64(Some(lit)),
+                    NumberKind::U64(lit) => TypeAnnotationKind::U64(Some(lit)),
+                    NumberKind::U32(lit) => TypeAnnotationKind::U32(Some(lit)),
+                    NumberKind::U16(lit) => TypeAnnotationKind::U16(Some(lit)),
+                    NumberKind::U8(lit) => TypeAnnotationKind::U8(Some(lit)),
+                    NumberKind::ISize(lit) => TypeAnnotationKind::ISize(Some(lit)),
+                    NumberKind::USize(lit) => TypeAnnotationKind::USize(Some(lit)),
+                };
                 self.advance();
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::Literal(LiteralType::Number(
-                        OrderedNumberKind(num_kind),
-                    )),
+                    kind: type_kind,
                     span,
                 }
             }
@@ -196,7 +208,7 @@ impl Parser {
                 let id = STRING_INTERNER.intern(s);
                 self.advance();
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::Literal(LiteralType::String(id)),
+                    kind: TypeAnnotationKind::String(Some(id)),
                     span,
                 }
             }
@@ -204,7 +216,7 @@ impl Parser {
                 let span = token.span.clone();
                 self.advance();
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::Literal(LiteralType::Bool(true)),
+                    kind: TypeAnnotationKind::Bool(Some(true)),
                     span,
                 }
             }
@@ -212,7 +224,7 @@ impl Parser {
                 let span = token.span.clone();
                 self.advance();
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::Literal(LiteralType::Bool(false)),
+                    kind: TypeAnnotationKind::Bool(Some(false)),
                     span,
                 }
             }
@@ -344,7 +356,7 @@ mod tests {
             (
                 "i8",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I8,
+                    kind: TypeAnnotationKind::I8(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -363,7 +375,7 @@ mod tests {
             (
                 "i16",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I16,
+                    kind: TypeAnnotationKind::I16(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -382,7 +394,7 @@ mod tests {
             (
                 "i32",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I32,
+                    kind: TypeAnnotationKind::I32(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -401,7 +413,7 @@ mod tests {
             (
                 "i64",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::I64,
+                    kind: TypeAnnotationKind::I64(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -420,7 +432,7 @@ mod tests {
             (
                 "f32",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::F32,
+                    kind: TypeAnnotationKind::F32(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -439,7 +451,7 @@ mod tests {
             (
                 "f64",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::F64,
+                    kind: TypeAnnotationKind::F64(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -458,7 +470,7 @@ mod tests {
             (
                 "u8",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U8,
+                    kind: TypeAnnotationKind::U8(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -477,7 +489,7 @@ mod tests {
             (
                 "u16",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U16,
+                    kind: TypeAnnotationKind::U16(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -496,7 +508,7 @@ mod tests {
             (
                 "u32",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U32,
+                    kind: TypeAnnotationKind::U32(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -515,7 +527,7 @@ mod tests {
             (
                 "u64",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::U64,
+                    kind: TypeAnnotationKind::U64(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -553,7 +565,7 @@ mod tests {
             (
                 "bool",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::Bool,
+                    kind: TypeAnnotationKind::Bool(None),
                     span: Span {
                         start: Position {
                             line: 1,
@@ -572,7 +584,7 @@ mod tests {
             (
                 "string",
                 TypeAnnotation {
-                    kind: TypeAnnotationKind::String,
+                    kind: TypeAnnotationKind::String(None),
                     span: Span {
                         start: Position {
                             line: 1,
