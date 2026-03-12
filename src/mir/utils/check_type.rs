@@ -10,7 +10,7 @@ use crate::{
         errors::{SemanticError, SemanticErrorKind},
         types::{
             checked_declaration::{CheckedDeclaration, CheckedParam, FnType},
-            checked_type::{SpannedType, Type},
+            checked_type::{SpannedType, StructKind, Type},
             ordered_float::{OrderedF32, OrderedF64},
         },
         utils::scope::Scope,
@@ -88,14 +88,15 @@ pub fn check_type_annotation(
         TypeAnnotationKind::U16(lit) => Type::U16(*lit),
         TypeAnnotationKind::U32(lit) => Type::U32(*lit),
         TypeAnnotationKind::U64(lit) => Type::U64(*lit),
+        TypeAnnotationKind::USize(lit) => Type::USize(*lit),
         TypeAnnotationKind::I8(lit) => Type::I8(*lit),
         TypeAnnotationKind::I16(lit) => Type::I16(*lit),
         TypeAnnotationKind::I32(lit) => Type::I32(*lit),
         TypeAnnotationKind::I64(lit) => Type::I64(*lit),
+        TypeAnnotationKind::ISize(lit) => Type::ISize(*lit),
         TypeAnnotationKind::F32(lit) => Type::F32(lit.map(OrderedF32)),
         TypeAnnotationKind::F64(lit) => Type::F64(lit.map(OrderedF64)),
-        TypeAnnotationKind::String(lit) => Type::String,
-
+        TypeAnnotationKind::String(lit) => Type::Struct(StructKind::StringHeader(*lit)),
         TypeAnnotationKind::Identifier(id) => {
             check_type_identifier_annotation(ctx, id.clone())
         }

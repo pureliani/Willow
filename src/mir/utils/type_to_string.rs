@@ -4,7 +4,7 @@ use crate::{
     globals::STRING_INTERNER,
     mir::types::{
         checked_declaration::{CheckedParam, FnType},
-        checked_type::{LiteralType, Type},
+        checked_type::{StructKind, Type},
     },
     tokenize::TokenKind,
 };
@@ -32,41 +32,84 @@ pub fn type_to_string_recursive(ty: &Type, visited_set: &mut HashSet<Type>) -> S
 
     let result = match ty {
         Type::Void => String::from("void"),
-        Type::Bool => String::from("bool"),
-        Type::U8 => String::from("u8"),
-        Type::U16 => String::from("u16"),
-        Type::U32 => String::from("u32"),
-        Type::U64 => String::from("u64"),
-        Type::USize => String::from("usize"),
-        Type::ISize => String::from("isize"),
-        Type::I8 => String::from("i8"),
-        Type::I16 => String::from("i16"),
-        Type::I32 => String::from("i32"),
-        Type::I64 => String::from("i64"),
-        Type::F32 => String::from("f32"),
-        Type::F64 => String::from("f64"),
-        Type::String => String::from("string"),
         Type::Null => String::from("null"),
         Type::Unknown => String::from("unknown"),
-        Type::Literal(literal) => literal_to_string(literal),
         Type::Never => String::from("never"),
-        Type::Struct(s) => struct_to_string(s, visited_set),
-        Type::Union { narrowed, .. } => union_variants_to_string(narrowed, visited_set),
+        Type::Bool(lit) => {
+            let suffix = String::from("bool");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::U8(lit) => {
+            let suffix = String::from("u8");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::U16(lit) => {
+            let suffix = String::from("u16");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::U32(lit) => {
+            let suffix = String::from("u32");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::U64(lit) => {
+            let suffix = String::from("u64");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::USize(lit) => {
+            let suffix = String::from("usize");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::ISize(lit) => {
+            let suffix = String::from("isize");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::I8(lit) => {
+            let suffix = String::from("i8");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::I16(lit) => {
+            let suffix = String::from("i16");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::I32(lit) => {
+            let suffix = String::from("i32");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::I64(lit) => {
+            let suffix = String::from("i64");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l, suffix))
+        }
+        Type::F32(lit) => {
+            let suffix = String::from("f32");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l.0, suffix))
+        }
+        Type::F64(lit) => {
+            let suffix = String::from("f64");
+            lit.map_or(suffix.clone(), |l| format!("{}{}", l.0, suffix))
+        }
+        Type::Struct(s) => match s {
+            StructKind::UserDefined(checked_params) => {
+                struct_to_string(checked_params, visited_set)
+            }
+            StructKind::TaggedUnion { narrowed, .. } => {
+                union_variants_to_string(narrowed, visited_set)
+            }
+            StructKind::ListHeader(item_type) => list_to_string(item_type, visited_set),
+            StructKind::StringHeader(string_id) => {
+                let string_ty = String::from("string");
+                string_id.map_or(string_ty.clone(), |id| {
+                    format!("\"{}\"", STRING_INTERNER.resolve(id))
+                })
+            }
+        },
         Type::Fn(fn_type) => fn_signature_to_string(fn_type, visited_set),
-        Type::List(item_type) => list_to_string(&item_type.kind, visited_set),
+        Type::Pointer(_) => todo!(),
+        Type::TaglessUnion(btree_set) => todo!(),
     };
 
     visited_set.remove(ty);
 
     result
-}
-
-pub fn literal_to_string(literal: &LiteralType) -> String {
-    match literal {
-        LiteralType::Number(ordered_number_kind) => ordered_number_kind.0.to_string(),
-        LiteralType::Bool(value) => value.to_string(),
-        LiteralType::String(id) => STRING_INTERNER.resolve(*id).to_string(),
-    }
 }
 
 fn struct_to_string(fields: &[CheckedParam], visited_set: &mut HashSet<Type>) -> String {

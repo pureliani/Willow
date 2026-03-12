@@ -1,11 +1,14 @@
 use std::collections::BTreeSet;
 
-use crate::{compile::interner::StringId, mir::types::checked_type::Type};
+use crate::{
+    compile::interner::StringId,
+    mir::types::checked_type::{StructKind, Type},
+};
 
 fn get_type_at_path(mut ty: &Type, path: &[StringId]) -> Option<Type> {
     for field_name in path {
         match ty {
-            Type::Struct(fields) => {
+            Type::Struct(StructKind::UserDefined(fields)) => {
                 let field = fields.iter().find(|f| f.identifier.name == *field_name)?;
                 ty = &field.ty.kind;
             }
