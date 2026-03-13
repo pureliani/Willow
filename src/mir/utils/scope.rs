@@ -18,6 +18,7 @@ pub enum ScopeKind {
         continue_target: BasicBlockId,
     },
     CodeBlock,
+    UnsafeBlock,
     File,
     GenericParams, // Not used for now
     Global,
@@ -103,10 +104,24 @@ impl Scope {
             return true;
         }
 
-        if matches!(kind, ScopeKind::CodeBlock | ScopeKind::WhileBody { .. }) {
+        if matches!(kind, ScopeKind::CodeBlock | ScopeKind::UnsafeBlock | ScopeKind::WhileBody { .. }) {
             return self
                 .parent()
                 .is_some_and(|parent| parent.within_function_body());
+        }
+
+        false
+    }
+
+    pub fn is_in_unsafe(&self) -> bool {
+        let kind = self.0.borrow().kind;
+
+        if let ScopeKind::UnsafeBlock = kind {
+            return true;
+        }
+
+        if let Some(parent) = self.parent() {
+            return parent.is_in_unsafe();
         }
 
         false
@@ -125,7 +140,7 @@ impl Scope {
             });
         }
 
-        if let ScopeKind::CodeBlock = kind {
+        if matches!(kind, ScopeKind::CodeBlock | ScopeKind::UnsafeBlock) {
             return self.parent().and_then(|parent| parent.within_loop_body());
         }
 

@@ -131,7 +131,10 @@ impl<'a> Builder<'a, InBlock> {
                 self.build_if(branches, else_branch, IfContext::Expression, expected_type)
             }
             ExprKind::CodeBlock(block_contents) => {
-                self.build_codeblock_expr(block_contents, expected_type).0
+                self.build_codeblock_expr(block_contents, expected_type, false).0
+            }
+            ExprKind::UnsafeBlock(block_contents) => {
+                self.build_codeblock_expr(block_contents, expected_type, true).0
             }
             ExprKind::Fn(fn_decl) => self.build_fn_expr(*fn_decl, expected_type),
             ExprKind::FnCall { left, args } => {

@@ -144,6 +144,7 @@ pub enum KeywordKind {
     String,
     Null,
     Extern,
+    Unsafe,
 }
 
 impl KeywordKind {
@@ -177,6 +178,7 @@ impl KeywordKind {
             KeywordKind::String => "string",
             KeywordKind::Null => "null",
             KeywordKind::Extern => "extern",
+            KeywordKind::Unsafe => "unsafe",
         })
     }
 }
@@ -577,6 +579,7 @@ fn is_keyword(identifier: &str) -> Option<KeywordKind> {
         "string" => Some(KeywordKind::String),
         "null" => Some(KeywordKind::Null),
         "extern" => Some(KeywordKind::Extern),
+        "unsafe" => Some(KeywordKind::Unsafe),
         _ => None,
     }
 }

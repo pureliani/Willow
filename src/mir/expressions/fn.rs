@@ -160,7 +160,7 @@ impl<'a> Builder<'a, InModule> {
 
         let return_type = fn_builder.get_fn().return_type.clone();
 
-        let (final_value, _) = fn_builder.build_codeblock_expr(body, Some(&return_type));
+        let (final_value, _) = fn_builder.build_codeblock_expr(body, Some(&return_type), false);
         if fn_builder.bb().terminator.is_none() {
             fn_builder.emit_return(final_value);
         }

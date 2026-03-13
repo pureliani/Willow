@@ -70,7 +70,7 @@ impl<'a> Builder<'a, InBlock> {
             }
 
             let (then_val, then_val_span) =
-                self.build_codeblock_expr(body, expected_type);
+                self.build_codeblock_expr(body, expected_type, false);
 
             if self.bb().terminator.is_none() {
                 branch_results.push((self.context.block_id, then_val, then_val_span));
@@ -90,7 +90,7 @@ impl<'a> Builder<'a, InBlock> {
 
         if let Some(else_body) = else_branch {
             let (else_val, else_val_span) =
-                self.build_codeblock_expr(else_body, expected_type);
+                self.build_codeblock_expr(else_body, expected_type, false);
 
             if self.bb().terminator.is_none() {
                 branch_results.push((self.context.block_id, else_val, else_val_span));
