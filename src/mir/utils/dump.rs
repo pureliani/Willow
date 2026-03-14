@@ -421,7 +421,7 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                 )
                 .unwrap();
             }
-            Instruction::BitCast(bitcast_instr) => {
+            Instruction::Reinterpret(bitcast_instr) => {
                 let dest_type_str = get_vt(p, &bitcast_instr.dest);
                 writeln!(
                     out,

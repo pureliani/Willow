@@ -6,7 +6,7 @@ use crate::{
     mir::{
         builders::{Builder, ExpectBody, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
-        instructions::{BitCastInstr, Instruction},
+        instructions::{Instruction, ReinterpretInstr},
         types::{
             checked_declaration::CheckedDeclaration,
             checked_type::{SpannedType, Type},
@@ -144,7 +144,7 @@ impl<'a> Builder<'a, InBlock> {
         }
 
         let new_val = self.new_value_id(new_type);
-        self.push_instruction(Instruction::BitCast(BitCastInstr {
+        self.push_instruction(Instruction::Reinterpret(ReinterpretInstr {
             src: current_val,
             dest: new_val,
         }));

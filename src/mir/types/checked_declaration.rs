@@ -34,9 +34,12 @@ impl PartialOrd for CheckedParam {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct FnType {
-    pub params: Vec<CheckedParam>,
-    pub return_type: Box<SpannedType>,
+pub enum FnType {
+    Direct(DeclarationId),
+    Indirect {
+        params: Vec<CheckedParam>,
+        return_type: Box<SpannedType>,
+    },
 }
 
 #[derive(Clone, Debug)]

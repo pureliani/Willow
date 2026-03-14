@@ -124,7 +124,6 @@ pub struct BasicBlock {
     pub instructions: Vec<Instruction>,
     pub terminator: Option<Terminator>,
     pub predecessors: HashSet<BasicBlockId>,
-    pub phis: HashMap<ValueId, HashSet<PhiSource>>,
     pub sealed: bool,
 }
 

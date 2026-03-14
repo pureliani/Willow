@@ -9,7 +9,7 @@ use crate::{
             InGlobal, InModule, PhiSource, ValueId,
         },
         errors::{SemanticError, SemanticErrorKind},
-        instructions::{CastInstr, Instruction, Terminator},
+        instructions::{Instruction, Terminator},
         types::{checked_declaration::CheckedDeclaration, checked_type::Type},
         utils::{
             adjustment::{compute_type_adjustment, Adjustment, AdjustmentError},
@@ -122,26 +122,6 @@ impl<'a> Builder<'a, InBlock> {
         self.program.value_types.get(&id).unwrap_or_else(|| {
             panic!("INTERNAL COMPILER ERROR: ValueId({}) has no type", id.0)
         })
-    }
-
-    pub fn apply_adjustment(
-        &mut self,
-        src: ValueId,
-        adjustment: Adjustment,
-        target_type: Type,
-    ) -> ValueId {
-        match adjustment {
-            Adjustment::Identity => src,
-            _ => {
-                let dest = self.new_value_id(target_type);
-                self.push_instruction(Instruction::Cast(CastInstr {
-                    src,
-                    dest,
-                    op: adjustment,
-                }));
-                dest
-            }
-        }
     }
 
     pub fn write_variable(

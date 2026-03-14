@@ -1,10 +1,14 @@
 use crate::ast::Span;
 use crate::compile::interner::StringId;
+use crate::mir::builders::ValueId;
 use crate::mir::errors::{SemanticError, SemanticErrorKind};
 use crate::mir::types::checked_type::Type;
 use crate::mir::utils::numeric::{
     get_numeric_type_rank, is_float, is_integer, is_signed,
 };
+
+#[derive(Clone, Debug)]
+pub enum CastInstr {}
 
 pub enum AdjustmentError {
     Incompatible,
@@ -15,15 +19,46 @@ pub enum AdjustmentError {
 pub enum Adjustment {
     Identity,
 
-    SExt,   // Sign Extend
-    ZExt,   // Zero Extend
-    Trunc,  // Truncate
-    FExt,   // Float Extend
-    FTrunc, // Float Truncate
-    SIToF,  // Signed Int To Float
-    UIToF,  // Unsigned Int To Float
-    FToSI,  // Float To Signed Int
-    FToUI,  // Float To Unsigned Int
+    SIToF {
+        dest: ValueId,
+        src: ValueId,
+    },
+    UIToF {
+        dest: ValueId,
+        src: ValueId,
+    },
+    FToSI {
+        dest: ValueId,
+        src: ValueId,
+    },
+    FToUI {
+        dest: ValueId,
+        src: ValueId,
+    },
+    FExt {
+        dest: ValueId,
+        src: ValueId,
+    },
+    FTrunc {
+        dest: ValueId,
+        src: ValueId,
+    },
+    Trunc {
+        dest: ValueId,
+        src: ValueId,
+    },
+    SExt {
+        dest: ValueId,
+        src: ValueId,
+    },
+    ZExt {
+        dest: ValueId,
+        src: ValueId,
+    },
+    BitCast {
+        dest: ValueId,
+        src: ValueId,
+    },
 
     WrapInUnion(usize),
     UnwrapUnion,

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::{
     globals::next_block_id,
@@ -18,7 +18,6 @@ impl<'a> Builder<'a, InFunction> {
             sealed: false,
             terminator: None,
             predecessors: HashSet::new(),
-            phis: HashMap::new(),
         };
 
         let decl = self

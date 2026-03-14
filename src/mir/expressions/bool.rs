@@ -2,7 +2,7 @@ use crate::{
     ast::Span,
     mir::{
         builders::{Builder, InBlock, ValueId},
-        types::checked_type::{LiteralType, SpannedType, Type},
+        types::checked_type::{SpannedType, Type},
     },
 };
 

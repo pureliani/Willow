@@ -1,7 +1,7 @@
 use crate::{
     globals::STRING_INTERNER,
     mir::types::{
-        checked_declaration::CheckedParam,
+        checked_declaration::{CheckedParam, FnType},
         checked_type::{StructKind, Type},
     },
 };
@@ -22,30 +22,60 @@ const PTR_ALIGN: usize = std::mem::align_of::<usize>();
 
 /// IMPORTANT: Make sure user-defined structs are packed (via pack_struct)
 /// before calling this function if you want minimized padding.
+/// returns None for zero-sized types
 pub fn get_layout_of(ty: &Type) -> Option<Layout> {
     match ty {
         Type::Void => None,
-        Type::Bool(lit) | Type::U8 | Type::I8 => Layout::new(1, 1),
-        Type::U16 | Type::I16 => Layout::new(2, 2),
-        Type::U32 | Type::I32 | Type::F32 => Layout::new(4, 4),
-        Type::U64 | Type::I64 | Type::F64 => Layout::new(8, 8),
-        Type::Pointer(_) | Type::Fn(_) | Type::USize | Type::ISize => {
-            Layout::new(PTR_SIZE, PTR_ALIGN)
+        Type::Bool(lit) => lit.map_or_else(|| Some(Layout::new(1, 1)), |_| None),
+        Type::U8(lit) => lit.map_or_else(|| Some(Layout::new(1, 1)), |_| None),
+        Type::I8(lit) => lit.map_or_else(|| Some(Layout::new(1, 1)), |_| None),
+
+        Type::U16(lit) => lit.map_or_else(|| Some(Layout::new(2, 2)), |_| None),
+        Type::I16(lit) => lit.map_or_else(|| Some(Layout::new(2, 2)), |_| None),
+
+        Type::U32(lit) => lit.map_or_else(|| Some(Layout::new(4, 4)), |_| None),
+        Type::I32(lit) => lit.map_or_else(|| Some(Layout::new(4, 4)), |_| None),
+        Type::F32(lit) => lit.map_or_else(|| Some(Layout::new(4, 4)), |_| None),
+
+        Type::U64(lit) => lit.map_or_else(|| Some(Layout::new(8, 8)), |_| None),
+        Type::I64(lit) => lit.map_or_else(|| Some(Layout::new(8, 8)), |_| None),
+        Type::F64(lit) => lit.map_or_else(|| Some(Layout::new(8, 8)), |_| None),
+
+        Type::USize(lit) => {
+            lit.map_or_else(|| Some(Layout::new(PTR_SIZE, PTR_ALIGN)), |_| None)
         }
-        Type::UnionPayload(variants) => {
+        Type::ISize(lit) => {
+            lit.map_or_else(|| Some(Layout::new(PTR_SIZE, PTR_ALIGN)), |_| None)
+        }
+
+        Type::Pointer(_) => Some(Layout::new(PTR_SIZE, PTR_ALIGN)),
+        Type::Fn(fntype) => match fntype {
+            FnType::Direct(declaration_id) => None,
+            FnType::Indirect { .. } => Some(Layout::new(PTR_SIZE, PTR_ALIGN)),
+        },
+        Type::TaglessUnion(variants) => {
+            assert!(variants.len() > 1);
+
             let mut max_size = 0;
             let mut max_align = 1;
+
             for v in variants {
-                let layout = get_layout_of(v);
+                let Some(layout) = get_layout_of(v) else {
+                    continue;
+                };
+
                 max_size = max_size.max(layout.size);
                 max_align = max_align.max(layout.alignment);
             }
-            Layout {
+
+            Some(Layout {
                 size: max_size,
                 alignment: max_align,
-            }
+            })
         }
-        Type::Unknown | Type::Never => Layout::new(0, 1),
+        Type::Unknown | Type::Never => {
+            panic!("INTERNAL COMPILER ERROR: Cannot get layout of type `unknown` and `never` types")
+        }
 
         Type::Struct(s) => {
             let fields = s.fields();

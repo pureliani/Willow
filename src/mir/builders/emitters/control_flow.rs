@@ -113,7 +113,7 @@ impl<'a> Builder<'a, InBlock> {
         self.seal_block(merge_block);
         self.use_basic_block(merge_block);
 
-        let phi_id = self.new_value_id(Type::Bool);
+        let phi_id = self.new_value_id(Type::Bool(None));
         let phi_sources = HashSet::from([
             PhiSource {
                 from: left_block,
@@ -173,7 +173,7 @@ impl<'a> Builder<'a, InBlock> {
         self.seal_block(merge_block);
         self.use_basic_block(merge_block);
 
-        let phi_id = self.new_value_id(Type::Bool);
+        let phi_id = self.new_value_id(Type::Bool(None));
         let phi_sources = HashSet::from([
             PhiSource {
                 from: left_block,

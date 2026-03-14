@@ -1,63 +1,63 @@
-use crate::{
-    ast::DeclarationId,
-    compile::interner::StringId,
-    mir::{
-        builders::{BasicBlockId, ValueId},
-        types::checked_type::Type,
-        utils::adjustment::Adjustment,
-    },
-    tokenize::NumberKind,
-};
-
-#[derive(Clone, Debug)]
-pub enum ConstInstr {
-    ConstNumber {
-        dest: ValueId,
-        val: NumberKind,
-    },
-    ConstBool {
-        dest: ValueId,
-        val: bool,
-    },
-    ConstString {
-        dest: ValueId,
-        val: StringId,
-    },
-    ConstFn {
-        dest: ValueId,
-        decl_id: DeclarationId,
-    },
-}
-
-#[derive(Clone, Debug)]
-pub enum UnaryInstr {
-    Neg { dest: ValueId, src: ValueId },
-    Not { dest: ValueId, src: ValueId },
-}
+use crate::mir::builders::{BasicBlockId, ValueId};
 
 #[derive(Clone, Debug)]
 pub enum BinaryInstr {
-    Add {
+    IAdd {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Sub {
+    ISub {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Mul {
+    IMul {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Div {
+    SDiv {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Rem {
+    UDiv {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    SRem {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    URem {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FRem {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FAdd {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FSub {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FMul {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FDiv {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
@@ -66,32 +66,82 @@ pub enum BinaryInstr {
 
 #[derive(Clone, Debug)]
 pub enum CompInstr {
-    Eq {
+    IEq {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Neq {
+    INeq {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Lt {
+    SLt {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Lte {
+    SLte {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Gt {
+    SGt {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
     },
-    Gte {
+    SGte {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    ULt {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    ULte {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    UGt {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    UGte {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FEq {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FNeq {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FLt {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FLte {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FGt {
+        dest: ValueId,
+        lhs: ValueId,
+        rhs: ValueId,
+    },
+    FGte {
         dest: ValueId,
         lhs: ValueId,
         rhs: ValueId,
@@ -99,67 +149,47 @@ pub enum CompInstr {
 }
 
 #[derive(Clone, Debug)]
-pub enum StructInstr {
-    Construct {
+pub enum UnaryInstr {
+    INeg { dest: ValueId, src: ValueId },
+    FNeg { dest: ValueId, src: ValueId },
+    BNot { dest: ValueId, src: ValueId },
+}
+
+#[derive(Clone, Debug)]
+pub enum MemoryInstr {
+    StackAlloc {
         dest: ValueId,
-        fields: Vec<(StringId, ValueId)>,
+        count: usize,
     },
-    ReadField {
+    HeapAlloc {
         dest: ValueId,
-        base: ValueId,
-        field: StringId,
+        count: ValueId,
     },
-    UpdateField {
-        dest: ValueId,
-        base: ValueId,
-        field: StringId,
+    HeapFree {
+        ptr: ValueId,
+    },
+    Store {
+        ptr: ValueId,
         value: ValueId,
     },
-}
-
-#[derive(Clone, Debug)]
-pub enum UnionInstr {
-    TestVariant {
+    Load {
+        dest: ValueId,
+        ptr: ValueId,
+    },
+    MemCopy {
         dest: ValueId,
         src: ValueId,
-        variant_type: Type,
     },
-}
-
-#[derive(Clone, Debug)]
-pub enum ListInstr {
-    Init {
+    GetFieldPtr {
         dest: ValueId,
-        element_type: Type,
-        items: Vec<ValueId>,
+        base_ptr: ValueId,
+        field_index: usize,
     },
-    Get {
+    PtrOffset {
         dest: ValueId,
-        list: ValueId,
+        base_ptr: ValueId,
         index: ValueId,
     },
-    GetUnsafe {
-        dest: ValueId,
-        list: ValueId,
-        index: ValueId,
-    },
-    Set {
-        dest: ValueId,
-        list: ValueId,
-        index: ValueId,
-        value: ValueId,
-    },
-    Len {
-        dest: ValueId,
-        list: ValueId,
-    },
-}
-
-#[derive(Clone, Debug)]
-pub struct CastInstr {
-    pub src: ValueId,
-    pub dest: ValueId,
-    pub op: Adjustment,
 }
 
 #[derive(Clone, Debug)]
@@ -178,24 +208,20 @@ pub struct SelectInstr {
 }
 
 #[derive(Clone, Debug)]
-pub struct BitCastInstr {
+pub struct ReinterpretInstr {
     pub src: ValueId,
     pub dest: ValueId,
 }
 
 #[derive(Clone, Debug)]
 pub enum Instruction {
-    Binary(BinaryInstr),
     Unary(UnaryInstr),
-    Const(ConstInstr),
+    Binary(BinaryInstr),
     Comp(CompInstr),
-    Struct(StructInstr),
-    Union(UnionInstr),
-    List(ListInstr),
-    Cast(CastInstr),
+    Memory(MemoryInstr),
     Call(CallInstr),
     Select(SelectInstr),
-    BitCast(BitCastInstr),
+    Reinterpret(ReinterpretInstr),
 }
 
 #[derive(Clone, Debug)]

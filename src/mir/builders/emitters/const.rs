@@ -3,11 +3,9 @@ use crate::{
     compile::interner::StringId,
     mir::{
         builders::{Builder, InBlock, ValueId},
-        instructions::{ConstInstr, Instruction},
         types::{
-            checked_declaration::{CheckedDeclaration, CheckedParam, FnType},
-            checked_type::{LiteralType, Type},
-            ordered_float::OrderedNumberKind,
+            checked_declaration::{CheckedDeclaration, FnType},
+            checked_type::{StructKind, Type},
         },
     },
     tokenize::NumberKind,
@@ -16,33 +14,15 @@ use crate::{
 impl<'a> Builder<'a, InBlock> {
     pub fn emit_number(&mut self, val: NumberKind) -> ValueId {
         let ty = Type::from_number_kind(&val);
-        let dest = self.new_value_id(ty);
-        self.push_instruction(Instruction::Const(ConstInstr::ConstNumber { dest, val }));
-        dest
-    }
-
-    pub fn emit_number_literal(&mut self, val: NumberKind) -> ValueId {
-        self.new_value_id(Type::Literal(LiteralType::Number(OrderedNumberKind(val))))
+        self.new_value_id(ty)
     }
 
     pub fn emit_bool(&mut self, val: bool) -> ValueId {
-        let dest = self.new_value_id(Type::Bool);
-        self.push_instruction(Instruction::Const(ConstInstr::ConstBool { dest, val }));
-        dest
-    }
-
-    pub fn emit_bool_literal(&mut self, val: bool) -> ValueId {
-        self.new_value_id(Type::Literal(LiteralType::Bool(val)))
+        self.new_value_id(Type::Bool(Some(val)))
     }
 
     pub fn emit_string(&mut self, val: StringId) -> ValueId {
-        let dest = self.new_value_id(Type::String);
-        self.push_instruction(Instruction::Const(ConstInstr::ConstString { dest, val }));
-        dest
-    }
-
-    pub fn emit_string_literal(&mut self, val: StringId) -> ValueId {
-        self.new_value_id(Type::Literal(LiteralType::String(val)))
+        self.new_value_id(Type::Struct(StructKind::StringHeader(Some(val))))
     }
 
     pub fn emit_const_void(&mut self) -> ValueId {
@@ -60,28 +40,12 @@ impl<'a> Builder<'a, InBlock> {
             .get(&decl_id)
             .expect("INTERNAL COMPILER ERROR: Function declaration not found");
 
-        let (params, return_type) = match decl {
-            CheckedDeclaration::Function(f) => {
-                let checked_params = f
-                    .params
-                    .iter()
-                    .map(|p| CheckedParam {
-                        identifier: p.identifier.clone(),
-                        ty: p.ty.clone(),
-                    })
-                    .collect();
-                (checked_params, Box::new(f.return_type.clone()))
-            }
-            _ => panic!("INTERNAL COMPILER ERROR: Declaration is not a function"),
-        };
+        if !matches!(decl, CheckedDeclaration::Function(_)) {
+            panic!("INTERNAL COMPILER ERROR: Declaration is not a function");
+        }
 
-        let ty = Type::Fn(FnType {
-            params,
-            return_type,
-        });
-
+        let ty = Type::Fn(FnType::Direct(decl_id));
         let dest = self.new_value_id(ty);
-        self.push_instruction(Instruction::Const(ConstInstr::ConstFn { dest, decl_id }));
         dest
     }
 }

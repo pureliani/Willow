@@ -1,127 +1,203 @@
-use crate::{
-    ast::Span,
-    mir::{
-        builders::{Builder, InBlock, ValueId},
-        errors::{SemanticError, SemanticErrorKind},
-        instructions::{BinaryInstr, Instruction},
-        utils::adjustment::{arithmetic_supertype, compute_type_adjustment},
-    },
+use crate::mir::{
+    builders::{Builder, InBlock, ValueId},
+    instructions::{BinaryInstr, Instruction},
+    utils::numeric::{is_float, is_integer, is_signed},
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn emit_arithmetic_op<OP: FnOnce(ValueId, ValueId, ValueId) -> BinaryInstr>(
-        &mut self,
-        lhs: ValueId,
-        lhs_span: Span,
-        rhs: ValueId,
-        rhs_span: Span,
-        op: OP,
-    ) -> ValueId {
-        let lhs_type = self.get_value_type(lhs).clone();
-        let rhs_type = self.get_value_type(rhs).clone();
-
-        let result_type = match arithmetic_supertype(
-            &lhs_type,
-            lhs_span.clone(),
-            &rhs_type,
-            rhs_span.clone(),
-        ) {
-            Ok(t) => t,
-            Err(e) => return self.report_error_and_get_poison(e),
-        };
-
-        let left_adjustment = compute_type_adjustment(&lhs_type, &result_type, false);
-        let adjusted_lhs = match left_adjustment {
-            Ok(adj) => self.apply_adjustment(lhs, adj, result_type.clone()),
-            Err(_) => {
-                return self.report_error_and_get_poison(SemanticError {
-                    kind: SemanticErrorKind::TypeMismatch {
-                        expected: result_type,
-                        received: lhs_type.clone(),
-                    },
-                    span: lhs_span,
-                })
-            }
-        };
-
-        let right_adjustment = compute_type_adjustment(&rhs_type, &result_type, false);
-        let adjusted_rhs = match right_adjustment {
-            Ok(adj) => self.apply_adjustment(rhs, adj, result_type.clone()),
-            Err(_) => {
-                return self.report_error_and_get_poison(SemanticError {
-                    kind: SemanticErrorKind::TypeMismatch {
-                        expected: result_type.clone(),
-                        received: rhs_type.clone(),
-                    },
-                    span: rhs_span,
-                })
-            }
-        };
-
-        let dest = self.new_value_id(result_type);
-        let binary_instr = op(dest, adjusted_lhs, adjusted_rhs);
-
-        self.push_instruction(Instruction::Binary(binary_instr));
+    fn emit_iadd(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::IAdd { dest, lhs, rhs }));
         dest
     }
 
-    pub fn emit_add(
-        &mut self,
-        lhs: ValueId,
-        lhs_span: Span,
-        rhs: ValueId,
-        rhs_span: Span,
-    ) -> ValueId {
-        self.emit_arithmetic_op(lhs, lhs_span, rhs, rhs_span, |dest, lhs, rhs| {
-            BinaryInstr::Add { dest, lhs, rhs }
-        })
+    fn emit_isub(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::ISub { dest, lhs, rhs }));
+        dest
     }
 
-    pub fn emit_sub(
-        &mut self,
-        lhs: ValueId,
-        lhs_span: Span,
-        rhs: ValueId,
-        rhs_span: Span,
-    ) -> ValueId {
-        self.emit_arithmetic_op(lhs, lhs_span, rhs, rhs_span, |dest, lhs, rhs| {
-            BinaryInstr::Sub { dest, lhs, rhs }
-        })
+    fn emit_imul(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::IMul { dest, lhs, rhs }));
+        dest
     }
 
-    pub fn emit_mul(
-        &mut self,
-        lhs: ValueId,
-        lhs_span: Span,
-        rhs: ValueId,
-        rhs_span: Span,
-    ) -> ValueId {
-        self.emit_arithmetic_op(lhs, lhs_span, rhs, rhs_span, |dest, lhs, rhs| {
-            BinaryInstr::Mul { dest, lhs, rhs }
-        })
+    fn emit_sdiv(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::SDiv { dest, lhs, rhs }));
+        dest
     }
 
-    pub fn emit_div(
-        &mut self,
-        lhs: ValueId,
-        lhs_span: Span,
-        rhs: ValueId,
-        rhs_span: Span,
-    ) -> ValueId {
-        self.emit_arithmetic_op(lhs, lhs_span, rhs, rhs_span, |dest, lhs, rhs| {
-            BinaryInstr::Div { dest, lhs, rhs }
-        })
+    fn emit_udiv(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::UDiv { dest, lhs, rhs }));
+        dest
     }
 
-    pub fn emit_rem(
-        &mut self,
-        lhs: ValueId,
-        lhs_span: Span,
-        rhs: ValueId,
-        rhs_span: Span,
-    ) -> ValueId {
-        self.emit_arithmetic_op(lhs, lhs_span, rhs, rhs_span, |dest, lhs, rhs| {
-            BinaryInstr::Rem { dest, lhs, rhs }
-        })
+    fn emit_srem(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::SRem { dest, lhs, rhs }));
+        dest
+    }
+
+    fn emit_urem(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::URem { dest, lhs, rhs }));
+        dest
+    }
+
+    fn emit_frem(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::FRem { dest, lhs, rhs }));
+        dest
+    }
+
+    fn emit_fadd(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::FAdd { dest, lhs, rhs }));
+        dest
+    }
+
+    fn emit_fsub(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::FSub { dest, lhs, rhs }));
+        dest
+    }
+
+    fn emit_fmul(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::FMul { dest, lhs, rhs }));
+        dest
+    }
+
+    fn emit_fdiv(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let ty = self.get_value_type(lhs).clone();
+        let dest = self.new_value_id(ty);
+        self.push_instruction(Instruction::Binary(BinaryInstr::FDiv { dest, lhs, rhs }));
+        dest
+    }
+}
+
+impl<'a> Builder<'a, InBlock> {
+    /// **Assumption:** lhs and rhs types are type-adjusted before calling this method
+    pub fn add(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let lhs_ty = self.get_value_type(lhs);
+        let rhs_ty = self.get_value_type(rhs);
+
+        pretty_assertions::assert_eq!(
+            lhs_ty,
+            rhs_ty,
+            "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
+        );
+
+        if is_float(&lhs_ty) {
+            self.emit_fadd(lhs, rhs)
+        } else if is_integer(&lhs_ty) {
+            self.emit_iadd(lhs, rhs)
+        } else {
+            panic!(
+                "INTERNAL COMPILER ERROR: Cannot use addition `+` operator on this type"
+            )
+        }
+    }
+
+    /// **Assumption:** lhs and rhs types are type-adjusted before calling this method
+    pub fn sub(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let lhs_ty = self.get_value_type(lhs);
+        let rhs_ty = self.get_value_type(rhs);
+
+        pretty_assertions::assert_eq!(
+            lhs_ty,
+            rhs_ty,
+            "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
+        );
+
+        if is_float(&lhs_ty) {
+            self.emit_fsub(lhs, rhs)
+        } else if is_integer(&lhs_ty) {
+            self.emit_isub(lhs, rhs)
+        } else {
+            panic!("INTERNAL COMPILER ERROR: Cannot use subtraction `-` operator on this type")
+        }
+    }
+
+    /// **Assumption:** lhs and rhs types are type-adjusted before calling this method
+    pub fn mul(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let lhs_ty = self.get_value_type(lhs);
+        let rhs_ty = self.get_value_type(rhs);
+
+        pretty_assertions::assert_eq!(
+            lhs_ty,
+            rhs_ty,
+            "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
+        );
+
+        if is_float(&lhs_ty) {
+            self.emit_fmul(lhs, rhs)
+        } else if is_integer(&lhs_ty) {
+            self.emit_imul(lhs, rhs)
+        } else {
+            panic!("INTERNAL COMPILER ERROR: Cannot use multiplication `*` operator on this type")
+        }
+    }
+
+    /// **Assumption:** lhs and rhs types are type-adjusted before calling this method
+    pub fn div(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let lhs_ty = self.get_value_type(lhs);
+        let rhs_ty = self.get_value_type(rhs);
+
+        pretty_assertions::assert_eq!(
+            lhs_ty,
+            rhs_ty,
+            "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
+        );
+
+        if is_float(&lhs_ty) {
+            self.emit_fdiv(lhs, rhs)
+        } else if is_signed(&lhs_ty) {
+            self.emit_sdiv(lhs, rhs)
+        } else if !is_signed(&lhs_ty) {
+            self.emit_udiv(lhs, rhs)
+        } else {
+            panic!(
+                "INTERNAL COMPILER ERROR: Cannot use division `/` operator on this type"
+            )
+        }
+    }
+
+    /// **Assumption:** lhs and rhs types are type-adjusted before calling this method
+    pub fn rem(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
+        let lhs_ty = self.get_value_type(lhs);
+        let rhs_ty = self.get_value_type(rhs);
+
+        pretty_assertions::assert_eq!(
+            lhs_ty,
+            rhs_ty,
+            "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
+        );
+
+        if is_float(&lhs_ty) {
+            self.emit_frem(lhs, rhs)
+        } else if is_signed(&lhs_ty) {
+            self.emit_srem(lhs, rhs)
+        } else if !is_signed(&lhs_ty) {
+            self.emit_urem(lhs, rhs)
+        } else {
+            panic!(
+                "INTERNAL COMPILER ERROR: Cannot use remainder `%` operator on this type"
+            )
+        }
     }
 }
