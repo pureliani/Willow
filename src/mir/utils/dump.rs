@@ -6,13 +6,12 @@ use crate::{
             ValueId,
         },
         instructions::{
-            BinaryInstr, CallInstr, CompInstr, ConstInstr, Instruction, ListInstr,
-            SelectInstr, StructInstr, Terminator, UnaryInstr, UnionInstr,
+            BinaryInstr, CallInstr, CompInstr, Instruction, MemoryInstr, SelectInstr,
+            Terminator, UnaryInstr,
         },
-        types::checked_declaration::CheckedDeclaration,
+        types::{checked_declaration::CheckedDeclaration, checked_type::Type},
         utils::type_to_string::type_to_string,
     },
-    tokenize::number_kind_to_suffix,
 };
 use std::{collections::VecDeque, fmt::Write};
 
@@ -96,24 +95,6 @@ pub fn dump_block(block_id: &BasicBlockId, f: &Function, p: &Program, out: &mut 
     }
     writeln!(out, "    }} ").unwrap();
 
-    writeln!(out, "    phis {{ ").unwrap();
-    for (dest, operands) in &bb.phis {
-        let ops_str = operands
-            .iter()
-            .map(|phi| format!("v{} from block_{}", phi.value.0, phi.from.0))
-            .collect::<Vec<_>>()
-            .join(", ");
-        writeln!(
-            out,
-            "      v{}: {} = phi [ {} ];",
-            dest.0,
-            get_vt(p, dest),
-            ops_str
-        )
-        .unwrap();
-    }
-    writeln!(out, "    }} ").unwrap();
-
     writeln!(out).unwrap();
 
     dump_instructions(&bb.instructions, p, out);
@@ -144,87 +125,52 @@ pub fn dump_block(block_id: &BasicBlockId, f: &Function, p: &Program, out: &mut 
 
 pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) {
     let get_binary_sign = |instr: &BinaryInstr| match instr {
-        BinaryInstr::Add { .. } => "+",
-        BinaryInstr::Sub { .. } => "-",
-        BinaryInstr::Mul { .. } => "*",
-        BinaryInstr::Div { .. } => "/",
-        BinaryInstr::Rem { .. } => "%",
+        BinaryInstr::IAdd { .. } | BinaryInstr::FAdd { .. } => "+",
+        BinaryInstr::ISub { .. } | BinaryInstr::FSub { .. } => "-",
+        BinaryInstr::IMul { .. } | BinaryInstr::FMul { .. } => "*",
+        BinaryInstr::SDiv { .. }
+        | BinaryInstr::UDiv { .. }
+        | BinaryInstr::FDiv { .. } => "/",
+        BinaryInstr::SRem { .. }
+        | BinaryInstr::URem { .. }
+        | BinaryInstr::FRem { .. } => "%",
     };
 
     let get_comp_sign = |instr: &CompInstr| match instr {
-        CompInstr::Eq { .. } => "==",
-        CompInstr::Neq { .. } => "!=",
-        CompInstr::Lt { .. } => "<",
-        CompInstr::Lte { .. } => "<=",
-        CompInstr::Gt { .. } => ">",
-        CompInstr::Gte { .. } => ">=",
+        CompInstr::IEq { .. } | CompInstr::FEq { .. } => "==",
+        CompInstr::INeq { .. } | CompInstr::FNeq { .. } => "!=",
+        CompInstr::SLt { .. } | CompInstr::ULt { .. } | CompInstr::FLt { .. } => "<",
+        CompInstr::SLte { .. } | CompInstr::ULte { .. } | CompInstr::FLte { .. } => "<=",
+        CompInstr::SGt { .. } | CompInstr::UGt { .. } | CompInstr::FGt { .. } => ">",
+        CompInstr::SGte { .. } | CompInstr::UGte { .. } | CompInstr::FGte { .. } => ">=",
     };
 
     for instruction in instrs {
         write!(out, "    ").unwrap();
         match instruction {
-            Instruction::Const(kind) => match kind {
-                ConstInstr::ConstNumber { dest, val } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = {};",
-                        dest.0,
-                        number_kind_to_suffix(val),
-                        val.to_string()
-                    )
-                    .unwrap();
-                }
-                ConstInstr::ConstBool { dest, val } => {
-                    writeln!(out, "v{}: bool = {};", dest.0, val).unwrap();
-                }
-                ConstInstr::ConstString { dest, val } => {
-                    let literal = STRING_INTERNER.resolve(*val);
-                    writeln!(out, "v{}: string = \"{}\";", dest.0, literal).unwrap();
-                }
-                ConstInstr::ConstFn { dest, decl_id } => {
-                    let decl = p.declarations.get(decl_id).unwrap_or_else(|| {
-                        panic!(
-                            "INTERNAL COMPILER ERROR: No corresponding for \
-                             DeclarationId({})",
-                            decl_id.0
-                        )
-                    });
-                    let fn_identifier = if let CheckedDeclaration::Function(f) = decl {
-                        f.identifier.clone()
-                    } else {
-                        panic!(
-                            "INTERNAL COMPILER ERROR: Expected declaration id to \
-                             correspond to a function"
-                        )
-                    };
-
-                    writeln!(
-                        out,
-                        "v{}: {} = <function {} from {}>;",
-                        dest.0,
-                        get_vt(p, dest),
-                        STRING_INTERNER.resolve(fn_identifier.name),
-                        fn_identifier.span.path.0.display()
-                    )
-                    .unwrap();
-                }
-            },
             Instruction::Unary(kind) => match kind {
-                UnaryInstr::Neg { dest, src } => {
+                UnaryInstr::INeg { dest, src } | UnaryInstr::FNeg { dest, src } => {
                     writeln!(out, "v{}: {} = -{};", dest.0, get_vt(p, dest), src.0)
                         .unwrap();
                 }
-                UnaryInstr::Not { dest, src } => {
+                UnaryInstr::BNot { dest, src } => {
                     writeln!(out, "v{}: {} = !{};", dest.0, get_vt(p, dest), src.0)
                         .unwrap();
                 }
             },
             Instruction::Binary(kind) => match kind {
-                BinaryInstr::Add { dest, lhs, rhs }
-                | BinaryInstr::Sub { dest, lhs, rhs }
-                | BinaryInstr::Mul { dest, lhs, rhs }
-                | BinaryInstr::Div { dest, lhs, rhs }
-                | BinaryInstr::Rem { dest, lhs, rhs } => {
+                BinaryInstr::IAdd { dest, lhs, rhs }
+                | BinaryInstr::ISub { dest, lhs, rhs }
+                | BinaryInstr::IMul { dest, lhs, rhs }
+                | BinaryInstr::SDiv { dest, lhs, rhs }
+                | BinaryInstr::UDiv { dest, lhs, rhs }
+                | BinaryInstr::SRem { dest, lhs, rhs }
+                | BinaryInstr::URem { dest, lhs, rhs }
+                | BinaryInstr::FRem { dest, lhs, rhs }
+                | BinaryInstr::FAdd { dest, lhs, rhs }
+                | BinaryInstr::FSub { dest, lhs, rhs }
+                | BinaryInstr::FMul { dest, lhs, rhs }
+                | BinaryInstr::FDiv { dest, lhs, rhs } => {
                     writeln!(
                         out,
                         "v{}: {} = v{} {} v{};",
@@ -238,12 +184,22 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                 }
             },
             Instruction::Comp(kind) => match kind {
-                CompInstr::Eq { dest, lhs, rhs }
-                | CompInstr::Neq { dest, lhs, rhs }
-                | CompInstr::Lt { dest, lhs, rhs }
-                | CompInstr::Lte { dest, lhs, rhs }
-                | CompInstr::Gt { dest, lhs, rhs }
-                | CompInstr::Gte { dest, lhs, rhs } => {
+                CompInstr::IEq { dest, lhs, rhs }
+                | CompInstr::INeq { dest, lhs, rhs }
+                | CompInstr::SLt { dest, lhs, rhs }
+                | CompInstr::SLte { dest, lhs, rhs }
+                | CompInstr::SGt { dest, lhs, rhs }
+                | CompInstr::SGte { dest, lhs, rhs }
+                | CompInstr::ULt { dest, lhs, rhs }
+                | CompInstr::ULte { dest, lhs, rhs }
+                | CompInstr::UGt { dest, lhs, rhs }
+                | CompInstr::UGte { dest, lhs, rhs }
+                | CompInstr::FEq { dest, lhs, rhs }
+                | CompInstr::FNeq { dest, lhs, rhs }
+                | CompInstr::FLt { dest, lhs, rhs }
+                | CompInstr::FLte { dest, lhs, rhs }
+                | CompInstr::FGt { dest, lhs, rhs }
+                | CompInstr::FGte { dest, lhs, rhs } => {
                     writeln!(
                         out,
                         "v{}: {} = v{} {} v{};",
@@ -290,137 +246,6 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                 )
                 .unwrap();
             }
-            Instruction::Struct(struct_instr) => match struct_instr {
-                StructInstr::Construct { dest, fields } => {
-                    let fields_str = fields
-                        .iter()
-                        .map(|(name, val)| {
-                            format!("{}: v{}", STRING_INTERNER.resolve(*name), val.0)
-                        })
-                        .collect::<Vec<String>>()
-                        .join(", ");
-                    writeln!(
-                        out,
-                        "v{}: {} = struct {{ {} }};",
-                        dest.0,
-                        get_vt(p, dest),
-                        fields_str
-                    )
-                    .unwrap();
-                }
-                StructInstr::ReadField { dest, base, field } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = v{}.{};",
-                        dest.0,
-                        get_vt(p, dest),
-                        base.0,
-                        STRING_INTERNER.resolve(*field)
-                    )
-                    .unwrap();
-                }
-                StructInstr::UpdateField {
-                    dest,
-                    base,
-                    field,
-                    value,
-                } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = update v{} {{ {}: v{} }};",
-                        dest.0,
-                        get_vt(p, dest),
-                        base.0,
-                        STRING_INTERNER.resolve(*field),
-                        value.0
-                    )
-                    .unwrap();
-                }
-            },
-            Instruction::Union(union_instr) => match union_instr {
-                UnionInstr::TestVariant {
-                    dest,
-                    src,
-                    variant_type,
-                } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = test_variant v{} is {};",
-                        dest.0,
-                        get_vt(p, dest),
-                        src.0,
-                        type_to_string(variant_type)
-                    )
-                    .unwrap();
-                }
-            },
-            Instruction::List(list_instr) => match list_instr {
-                ListInstr::Init {
-                    dest,
-                    element_type: _,
-                    items,
-                } => {
-                    let items_str = items
-                        .iter()
-                        .map(|v| format!("v{}", v.0))
-                        .collect::<Vec<String>>()
-                        .join(", ");
-                    writeln!(out, "v{}: {} = [{}];", dest.0, get_vt(p, dest), items_str)
-                        .unwrap();
-                }
-                ListInstr::Get { dest, list, index } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = v{}::get({});",
-                        dest.0,
-                        get_vt(p, dest),
-                        list.0,
-                        index.0
-                    )
-                    .unwrap();
-                }
-                ListInstr::GetUnsafe { dest, list, index } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = v{}::getUnsafe({});",
-                        dest.0,
-                        get_vt(p, dest),
-                        list.0,
-                        index.0
-                    )
-                    .unwrap();
-                }
-                ListInstr::Set {
-                    dest,
-                    list,
-                    index,
-                    value,
-                } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = setListItem(v{}[{}] to v{});",
-                        dest.0,
-                        get_vt(p, dest),
-                        list.0,
-                        index.0,
-                        value.0
-                    )
-                    .unwrap();
-                }
-                ListInstr::Len { dest, list } => {
-                    writeln!(out, "v{}: {} = len(v{});", dest.0, get_vt(p, dest), list.0)
-                        .unwrap();
-                }
-            },
-            Instruction::Cast(cast_instr) => {
-                let dest_type_str = get_vt(p, &cast_instr.dest);
-                writeln!(
-                    out,
-                    "v{}: {} = v{}::as({})",
-                    cast_instr.dest.0, dest_type_str, cast_instr.src.0, dest_type_str,
-                )
-                .unwrap();
-            }
             Instruction::Reinterpret(bitcast_instr) => {
                 let dest_type_str = get_vt(p, &bitcast_instr.dest);
                 writeln!(
@@ -430,6 +255,96 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                 )
                 .unwrap();
             }
+            Instruction::Memory(kind) => match kind {
+                MemoryInstr::StackAlloc { dest, count } => {
+                    let inner_ty = match &p.value_types[dest] {
+                        Type::Pointer(to) => type_to_string(to),
+                        _ => "unknown".to_string(),
+                    };
+                    writeln!(
+                        out,
+                        "v{}: {} = stackAlloc(v{} x {});",
+                        dest.0,
+                        get_vt(p, dest),
+                        count,
+                        inner_ty
+                    )
+                    .unwrap();
+                }
+                MemoryInstr::HeapAlloc { dest, count } => {
+                    let inner_ty = match &p.value_types[dest] {
+                        Type::Pointer(to) => type_to_string(to),
+                        _ => "unknown".to_string(),
+                    };
+                    writeln!(
+                        out,
+                        "v{}: {} = heapAlloc(v{} x {});",
+                        dest.0,
+                        get_vt(p, dest),
+                        count.0,
+                        inner_ty
+                    )
+                    .unwrap();
+                }
+                MemoryInstr::HeapFree { ptr } => {
+                    writeln!(out, "free(v{})", ptr.0).unwrap();
+                }
+                MemoryInstr::Store { ptr, value } => {
+                    writeln!(out, "*v{} = v{};", ptr.0, value.0).unwrap();
+                }
+                MemoryInstr::Load { dest, ptr } => {
+                    writeln!(out, "v{}: {} = *v{};", dest.0, get_vt(p, dest), ptr.0)
+                        .unwrap();
+                }
+                MemoryInstr::MemCopy { dest, src } => {
+                    writeln!(
+                        out,
+                        "memcopy from address v{} to address v{};",
+                        dest.0, src.0
+                    )
+                    .unwrap();
+                }
+                MemoryInstr::GetFieldPtr {
+                    dest,
+                    base_ptr,
+                    field_index,
+                } => {
+                    let base_ty = &p.value_types[base_ptr];
+                    let field_name = match base_ty {
+                        Type::Pointer(to) => match &**to {
+                            Type::Struct(s) => {
+                                STRING_INTERNER.resolve(s.fields()[*field_index].0)
+                            }
+                            _ => format!("{}", field_index),
+                        },
+                        _ => format!("{}", field_index),
+                    };
+                    writeln!(
+                        out,
+                        "v{}: {} = &v{}.{};",
+                        dest.0,
+                        get_vt(p, dest),
+                        base_ptr.0,
+                        field_name
+                    )
+                    .unwrap();
+                }
+                MemoryInstr::PtrOffset {
+                    dest,
+                    base_ptr,
+                    index,
+                } => {
+                    writeln!(
+                        out,
+                        "v{}: {} = {} + {};",
+                        dest.0,
+                        get_vt(p, dest),
+                        base_ptr.0,
+                        index.0
+                    )
+                    .unwrap();
+                }
+            },
         }
     }
 }

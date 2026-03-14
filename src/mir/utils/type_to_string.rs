@@ -145,21 +145,28 @@ pub fn list_to_string(item_type: &Type, visited_set: &mut HashSet<Type>) -> Stri
 }
 
 fn fn_signature_to_string(fn_type: &FnType, visited_set: &mut HashSet<Type>) -> String {
-    let params_str = fn_type
-        .params
-        .iter()
-        .map(|p| {
-            format!(
-                "{}: {}",
-                STRING_INTERNER.resolve(p.identifier.name),
-                type_to_string_recursive(&p.ty.kind, visited_set)
-            )
-        })
-        .collect::<Vec<String>>()
-        .join(", ");
+    match fn_type {
+        FnType::Direct(id) => format!("fn_{}", id.0),
+        FnType::Indirect {
+            params,
+            return_type,
+        } => {
+            let params_str = params
+                .iter()
+                .map(|p| {
+                    format!(
+                        "{}: {}",
+                        STRING_INTERNER.resolve(p.identifier.name),
+                        type_to_string_recursive(&p.ty.kind, visited_set)
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
 
-    let return_type_str =
-        type_to_string_recursive(&fn_type.return_type.kind, visited_set);
+            let return_type_str =
+                type_to_string_recursive(&return_type.kind, visited_set);
 
-    format!("fn({}): {}", params_str, return_type_str)
+            format!("fn({}): {}", params_str, return_type_str)
+        }
+    }
 }
