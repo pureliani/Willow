@@ -65,37 +65,37 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::Not { right } => self.build_not_expr(*right, expected_type),
             ExprKind::Neg { right } => self.build_neg_expr(*right, expected_type),
             ExprKind::Add { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_add, expected_type)
+                self.build_binary_op(*left, *right, Self::add, expected_type)
             }
             ExprKind::Subtract { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_sub, expected_type)
+                self.build_binary_op(*left, *right, Self::sub, expected_type)
             }
             ExprKind::Multiply { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_mul, expected_type)
+                self.build_binary_op(*left, *right, Self::mul, expected_type)
             }
             ExprKind::Divide { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_div, expected_type)
+                self.build_binary_op(*left, *right, Self::div, expected_type)
             }
             ExprKind::Modulo { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_rem, expected_type)
+                self.build_binary_op(*left, *right, Self::rem, expected_type)
             }
             ExprKind::LessThan { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_lt, expected_type)
+                self.build_binary_op(*left, *right, Self::lt, expected_type)
             }
             ExprKind::LessThanOrEqual { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_lte, expected_type)
+                self.build_binary_op(*left, *right, Self::lte, expected_type)
             }
             ExprKind::GreaterThan { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_gt, expected_type)
+                self.build_binary_op(*left, *right, Self::gt, expected_type)
             }
             ExprKind::GreaterThanOrEqual { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_gte, expected_type)
+                self.build_binary_op(*left, *right, Self::gte, expected_type)
             }
             ExprKind::Equal { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_eq, expected_type)
+                self.build_binary_op(*left, *right, Self::eq, expected_type)
             }
             ExprKind::NotEqual { left, right } => {
-                self.build_binary_op(*left, *right, Self::emit_neq, expected_type)
+                self.build_binary_op(*left, *right, Self::neq, expected_type)
             }
             ExprKind::And { left, right } => {
                 self.build_and_expr(*left, *right, expected_type)
@@ -131,10 +131,12 @@ impl<'a> Builder<'a, InBlock> {
                 self.build_if(branches, else_branch, IfContext::Expression, expected_type)
             }
             ExprKind::CodeBlock(block_contents) => {
-                self.build_codeblock_expr(block_contents, expected_type, false).0
+                self.build_codeblock_expr(block_contents, expected_type, false)
+                    .0
             }
             ExprKind::UnsafeBlock(block_contents) => {
-                self.build_codeblock_expr(block_contents, expected_type, true).0
+                self.build_codeblock_expr(block_contents, expected_type, true)
+                    .0
             }
             ExprKind::Fn(fn_decl) => self.build_fn_expr(*fn_decl, expected_type),
             ExprKind::FnCall { left, args } => {

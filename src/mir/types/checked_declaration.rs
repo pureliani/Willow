@@ -6,7 +6,7 @@ use std::{
 use crate::{
     ast::{DeclarationId, IdentifierNode, Span},
     mir::{
-        builders::Function,
+        builders::{Function, ValueId},
         types::checked_type::{SpannedType, Type},
     },
     parse::DocAnnotation,
@@ -71,7 +71,8 @@ pub struct CheckedVarDecl {
     pub id: DeclarationId,
     pub identifier: IdentifierNode,
     pub documentation: Option<DocAnnotation>,
-    pub constraint: SpannedType,
+    pub constraint_span: Span,
+    pub stack_ptr: ValueId,
 }
 
 #[derive(Clone, Debug)]

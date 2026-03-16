@@ -57,24 +57,18 @@ impl<'a> Builder<'a, InBlock> {
         self.push_instruction(Instruction::Memory(MemoryInstr::MemCopy { dest, src }));
     }
 
-    pub fn emit_store(&mut self, ptr: ValueId, value: ValueId, span: Span) {
+    pub fn emit_store(&mut self, ptr: ValueId, value: ValueId) {
         let ptr_ty = self.get_value_type(ptr).clone();
         let val_ty = self.get_value_type(value).clone();
 
         if let Type::Pointer(to) = ptr_ty {
-            if val_ty == *to {
-                self.as_program().errors.push(SemanticError {
-                    kind: SemanticErrorKind::TypeMismatch {
-                        expected: *to.clone(),
-                        received: val_ty.clone(),
-                    },
-                    span,
-                });
+            if val_ty != *to {
+                panic!("INTERNAL COMPILER ERROR: Store instruction expected the provided value to match pointed to type");
             }
 
             self.push_instruction(Instruction::Memory(MemoryInstr::Store { ptr, value }));
         } else {
-            panic!("INTERNAL COMPILER ERROR: Store expected pointer");
+            panic!("INTERNAL COMPILER ERROR: Store instruction expected a pointer");
         };
     }
 

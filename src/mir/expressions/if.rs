@@ -132,7 +132,7 @@ impl<'a> Builder<'a, InBlock> {
             self.insert_phi(merge_block_id, phi_id, phi_sources);
             phi_id
         } else {
-            self.emit_const_void()
+            self.emit_void()
         };
 
         self.check_expected(result, expr_span, expected_type)

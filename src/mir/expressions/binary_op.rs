@@ -11,11 +11,11 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         left: Expr,
         right: Expr,
-        emit_fn: F,
+        op: F,
         expected_type: Option<&SpannedType>,
     ) -> ValueId
     where
-        F: FnOnce(&mut Self, ValueId, Span, ValueId, Span) -> ValueId,
+        F: FnOnce(&mut Self, ValueId, ValueId) -> ValueId,
     {
         let left_span = left.span.clone();
         let left_value = self.build_expr(left, None);
@@ -23,13 +23,9 @@ impl<'a> Builder<'a, InBlock> {
         let right_span = right.span.clone();
         let right_value = self.build_expr(right, None);
 
-        let result = emit_fn(
-            self,
-            left_value,
-            left_span.clone(),
-            right_value,
-            right_span.clone(),
-        );
+        // TODO: do adjustment before calling op()
+
+        let result = op(self, left_value, right_value);
 
         let span = Span {
             start: left_span.start,

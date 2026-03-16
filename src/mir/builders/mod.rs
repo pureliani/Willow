@@ -9,7 +9,7 @@ use crate::{
             checked_declaration::{CheckedDeclaration, FunctionEffects},
             checked_type::{SpannedType, Type},
         },
-        utils::{points_to::PointsToGraph, scope::Scope},
+        utils::{place::Place, points_to::PointsToGraph, scope::Scope},
     },
 };
 
@@ -124,6 +124,7 @@ pub struct BasicBlock {
     pub instructions: Vec<Instruction>,
     pub terminator: Option<Terminator>,
     pub predecessors: HashSet<BasicBlockId>,
+    pub phis: HashMap<ValueId, HashSet<PhiSource>>,
     pub sealed: bool,
 }
 
@@ -137,9 +138,9 @@ pub struct Builder<'a, C: BuilderContext> {
 
     pub type_predicates: &'a mut HashMap<ValueId, Vec<TypePredicate>>,
 
-    pub current_defs: &'a mut HashMap<BasicBlockId, HashMap<DeclarationId, ValueId>>,
-    pub incomplete_phis:
-        &'a mut HashMap<BasicBlockId, Vec<(ValueId, DeclarationId, Span)>>,
+    pub current_defs: &'a mut HashMap<BasicBlockId, HashMap<Place, ValueId>>,
+    pub aliases: &'a mut HashMap<DeclarationId, Place>,
+    pub incomplete_phis: &'a mut HashMap<BasicBlockId, Vec<(ValueId, Place, Span)>>,
 
     pub ptg: &'a mut PointsToGraph,
 }

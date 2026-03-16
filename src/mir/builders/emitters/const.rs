@@ -25,11 +25,11 @@ impl<'a> Builder<'a, InBlock> {
         self.new_value_id(Type::Struct(StructKind::StringHeader(Some(val))))
     }
 
-    pub fn emit_const_void(&mut self) -> ValueId {
+    pub fn emit_void(&mut self) -> ValueId {
         self.new_value_id(Type::Void)
     }
 
-    pub fn emit_const_null(&mut self) -> ValueId {
+    pub fn emit_null(&mut self) -> ValueId {
         self.new_value_id(Type::Null)
     }
 

@@ -25,7 +25,7 @@ const PTR_ALIGN: usize = std::mem::align_of::<usize>();
 /// returns None for zero-sized types
 pub fn get_layout_of(ty: &Type) -> Option<Layout> {
     match ty {
-        Type::Void => None,
+        Type::Void | Type::Null => None,
         Type::Bool(lit) => lit.map_or_else(|| Some(Layout::new(1, 1)), |_| None),
         Type::U8(lit) => lit.map_or_else(|| Some(Layout::new(1, 1)), |_| None),
         Type::I8(lit) => lit.map_or_else(|| Some(Layout::new(1, 1)), |_| None),

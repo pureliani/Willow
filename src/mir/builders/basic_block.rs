@@ -1,20 +1,16 @@
 use std::collections::HashSet;
 
 use crate::{
-    ast::{DeclarationId, Span},
+    ast::Span,
     globals::next_value_id,
     mir::{
         builders::{
             BasicBlock, BasicBlockId, Builder, ExpectBody, Function, InBlock, InFunction,
-            InGlobal, InModule, PhiSource, ValueId,
+            InGlobal, InModule, PhiSource, Place, ValueId,
         },
-        errors::{SemanticError, SemanticErrorKind},
-        instructions::{Instruction, Terminator},
+        instructions::Terminator,
         types::{checked_declaration::CheckedDeclaration, checked_type::Type},
-        utils::{
-            adjustment::{compute_type_adjustment, Adjustment, AdjustmentError},
-            type_to_string::type_to_string,
-        },
+        utils::type_to_string::type_to_string,
     },
 };
 
@@ -26,9 +22,10 @@ impl<'a> Builder<'a, InBlock> {
             errors: self.errors,
             current_scope: self.current_scope.clone(),
             current_defs: self.current_defs,
+            aliases: self.aliases,
+            ptg: self.ptg,
             incomplete_phis: self.incomplete_phis,
             type_predicates: self.type_predicates,
-            ptg: self.ptg,
         }
     }
 
@@ -41,9 +38,10 @@ impl<'a> Builder<'a, InBlock> {
             errors: self.errors,
             current_scope: self.current_scope.clone(),
             current_defs: self.current_defs,
+            aliases: self.aliases,
+            ptg: self.ptg,
             incomplete_phis: self.incomplete_phis,
             type_predicates: self.type_predicates,
-            ptg: self.ptg,
         }
     }
 
@@ -57,9 +55,10 @@ impl<'a> Builder<'a, InBlock> {
             errors: self.errors,
             current_scope: self.current_scope.clone(),
             current_defs: self.current_defs,
+            aliases: self.aliases,
+            ptg: self.ptg,
             incomplete_phis: self.incomplete_phis,
             type_predicates: self.type_predicates,
-            ptg: self.ptg,
         }
     }
 
@@ -124,64 +123,6 @@ impl<'a> Builder<'a, InBlock> {
         })
     }
 
-    pub fn write_variable(
-        &mut self,
-        variable: DeclarationId,
-        block: BasicBlockId,
-        value: ValueId,
-    ) {
-        self.current_defs
-            .entry(block)
-            .or_default()
-            .insert(variable, value);
-    }
-
-    pub fn read_variable(
-        &mut self,
-        variable: DeclarationId,
-        block: BasicBlockId,
-        span: Span,
-    ) -> ValueId {
-        if let Some(block_defs) = self.current_defs.get(&block) {
-            if let Some(val) = block_defs.get(&variable) {
-                return *val;
-            }
-        }
-        self.read_variable_recursive(variable, block, span)
-    }
-
-    fn read_variable_recursive(
-        &mut self,
-        variable: DeclarationId,
-        block: BasicBlockId,
-        span: Span,
-    ) -> ValueId {
-        let val_id;
-        let sealed = self.get_bb(block).sealed;
-        let predecessors: Vec<BasicBlockId> =
-            self.get_bb(block).predecessors.iter().cloned().collect();
-
-        if !sealed {
-            val_id = self.new_value_id(Type::Unknown);
-            self.incomplete_phis.entry(block).or_default().push((
-                val_id,
-                variable,
-                span.clone(),
-            ));
-        } else if predecessors.len() == 1 {
-            val_id = self.read_variable(variable, predecessors[0], span.clone());
-        } else if predecessors.is_empty() {
-            panic!("INTERNAL COMPILER ERROR: Uninitialized local variable read");
-        } else {
-            val_id = self.new_value_id(Type::Unknown);
-            self.write_variable(variable, block, val_id);
-            self.resolve_phi(block, val_id, variable, span.clone());
-        }
-
-        self.write_variable(variable, block, val_id);
-        val_id
-    }
-
     pub fn insert_phi(
         &mut self,
         basic_block_id: BasicBlockId,
@@ -216,157 +157,190 @@ impl<'a> Builder<'a, InBlock> {
         self.get_bb_mut(basic_block_id).phis.insert(phi_id, sources);
     }
 
-    pub fn resolve_phi(
+    fn successor_count(&self, block_id: BasicBlockId) -> usize {
+        let bb = self.get_bb(block_id);
+        match &bb.terminator {
+            Some(Terminator::CondJump { .. }) => 2,
+            Some(Terminator::Jump { .. }) => 1,
+            Some(Terminator::Return { .. }) => 0,
+            None => 0,
+        }
+    }
+
+    /// Replaces occurrences of `old_target` with `new_target` in the
+    /// terminator of `block_id`.
+    fn retarget_terminator(
         &mut self,
         block_id: BasicBlockId,
-        phi_id: ValueId,
-        variable_id: DeclarationId,
-        span: Span,
+        old_target: BasicBlockId,
+        new_target: BasicBlockId,
     ) {
-        let predecessors: Vec<BasicBlockId> =
-            self.get_bb(block_id).predecessors.iter().cloned().collect();
-
-        let mut incoming_values = Vec::new();
-        let mut incoming_types = Vec::new();
-
-        for pred in &predecessors {
-            let val = self.read_variable(variable_id, *pred, span.clone());
-            incoming_values.push((*pred, val));
-            incoming_types.push(self.get_value_type(val).clone());
-        }
-
-        let unified_type = Type::make_union(incoming_types);
-
-        let phi_ty = self.program.value_types.get_mut(&phi_id).expect(
-            "INTERNAL COMPILER ERROR: Expected the type for phi_id to be defined",
-        );
-        *phi_ty = unified_type.clone();
-
-        let mut final_sources = HashSet::new();
-
-        for (pred_block, val) in incoming_values {
-            let val_type = self.get_value_type(val);
-
-            if val_type == &unified_type {
-                final_sources.insert(PhiSource {
-                    from: pred_block,
-                    value: val,
-                });
-            } else {
-                let insertion_block = self.split_critical_edge(pred_block, block_id);
-
-                let casted_val = self.adjust_phi_source_value(
-                    insertion_block,
-                    val,
-                    unified_type.clone(),
-                    span.clone(),
+        let bb = self.get_bb_mut(block_id);
+        match &mut bb.terminator {
+            Some(Terminator::Jump { target }) => {
+                assert_eq!(
+                    *target, old_target,
+                    "INTERNAL COMPILER ERROR: retarget_terminator: jump target mismatch"
                 );
-
-                final_sources.insert(PhiSource {
-                    from: insertion_block,
-                    value: casted_val,
-                });
+                *target = new_target;
             }
-        }
-
-        self.insert_phi(block_id, phi_id, final_sources.clone());
-
-        let source_values: Vec<ValueId> =
-            final_sources.into_iter().map(|s| s.value).collect();
-        self.ptg.merge_values(phi_id, &source_values);
-    }
-
-    pub fn adjust_phi_source_value(
-        &mut self,
-        block_id: BasicBlockId,
-        src: ValueId,
-        target_type: Type,
-        error_span: Span,
-    ) -> ValueId {
-        let old_block = self.context.block_id;
-        self.use_basic_block(block_id);
-
-        let terminator = self.bb_mut().terminator.take();
-
-        let src_type = self.get_value_type(src);
-        let adjusted_value = match compute_type_adjustment(src_type, &target_type, false)
-        {
-            Ok(adj) => self.apply_adjustment(src, adj, target_type),
-            Err(e) => self.report_error_and_get_poison(SemanticError {
-                kind: match e {
-                    AdjustmentError::Incompatible => SemanticErrorKind::TypeMismatch {
-                        expected: target_type.clone(),
-                        received: src_type.clone(),
-                    },
-                    AdjustmentError::TryExplicitCast => {
-                        SemanticErrorKind::TryExplicitCast
-                    }
-                },
-                span: error_span,
-            }),
-        };
-
-        self.bb_mut().terminator = terminator;
-
-        self.use_basic_block(old_block);
-        adjusted_value
-    }
-
-    fn split_critical_edge(
-        &mut self,
-        pred_id: BasicBlockId,
-        succ_id: BasicBlockId,
-    ) -> BasicBlockId {
-        let needs_split = {
-            let pred_bb = self.get_bb(pred_id);
-            match &pred_bb.terminator {
-                Some(Terminator::CondJump { .. }) => true,
-                Some(Terminator::Jump { .. }) => false, // only one successor
-                _ => panic!(
-                    "INTERNAL COMPILER ERROR: Predecessor of Phi ends with Return or \
-                     None"
-                ),
-            }
-        };
-
-        if !needs_split {
-            return pred_id;
-        }
-
-        let split_block_id = self.as_fn().new_bb();
-
-        let old_block = self.context.block_id;
-        self.use_basic_block(split_block_id);
-        self.emit_jmp(succ_id);
-        self.seal();
-
-        self.use_basic_block(old_block);
-
-        let pred_bb = self.get_bb_mut(pred_id);
-
-        match &mut pred_bb.terminator {
             Some(Terminator::CondJump {
                 true_target,
                 false_target,
                 ..
             }) => {
-                if *true_target == succ_id {
-                    *true_target = split_block_id;
+                if *true_target == old_target {
+                    *true_target = new_target;
                 }
-                if *false_target == succ_id {
-                    *false_target = split_block_id;
+                if *false_target == old_target {
+                    *false_target = new_target;
                 }
             }
-            _ => unreachable!("We checked needs_split above"),
+            _ => panic!(
+                "INTERNAL COMPILER ERROR: retarget_terminator: block has no \
+                 branchable terminator"
+            ),
+        }
+    }
+
+    /// Splits a critical edge from `pred_block` to `target_block` by inserting
+    /// a new block in between.
+    ///
+    /// A critical edge is one where the predecessor has multiple successors
+    /// and the target has multiple predecessors. Splitting is necessary so that
+    /// coercion instructions for one edge don't affect other edges.
+    ///
+    /// Before: pred_block -> target_block
+    /// After:  pred_block -> split_block -> target_block
+    fn split_critical_edge(
+        &mut self,
+        pred_block: BasicBlockId,
+        target_block: BasicBlockId,
+    ) -> BasicBlockId {
+        let split_id = self.as_fn().new_bb();
+
+        self.get_bb_mut(split_id).terminator = Some(Terminator::Jump {
+            target: target_block,
+        });
+        self.get_bb_mut(split_id).sealed = true;
+        self.get_bb_mut(split_id).predecessors.insert(pred_block);
+
+        self.retarget_terminator(pred_block, target_block, split_id);
+
+        self.get_bb_mut(target_block)
+            .predecessors
+            .remove(&pred_block);
+        self.get_bb_mut(target_block).predecessors.insert(split_id);
+
+        if let Some(defs) = self.current_defs.get(&pred_block).cloned() {
+            self.current_defs.insert(split_id, defs);
         }
 
-        let succ_bb = self.get_bb_mut(succ_id);
-        succ_bb.predecessors.remove(&pred_id);
+        split_id
+    }
 
-        let split_bb = self.get_bb_mut(split_block_id);
-        split_bb.predecessors.insert(pred_id);
+    /// Returns the block where coercion instructions should be emitted for
+    /// the edge from `pred_block` to `target_block`. Splits the edge if it
+    /// is critical.
+    pub fn get_coercion_block(
+        &mut self,
+        pred_block: BasicBlockId,
+        target_block: BasicBlockId,
+    ) -> BasicBlockId {
+        let pred_has_multiple_successors = self.successor_count(pred_block) > 1;
+        let target_has_multiple_predecessors =
+            self.get_bb(target_block).predecessors.len() > 1;
 
-        split_block_id
+        if pred_has_multiple_successors && target_has_multiple_predecessors {
+            self.split_critical_edge(pred_block, target_block)
+        } else {
+            pred_block
+        }
+    }
+
+    /// Coerces a value to match a union type by wrapping, widening, or
+    /// narrowing as needed. Must be called with `self.context.block_id`
+    /// set to the block where the coercion instructions should be emitted.
+    pub fn coerce_to_union(&mut self, val: ValueId, target_union: &Type) -> ValueId {
+        let val_type = self.get_value_type(val).clone();
+
+        if val_type == *target_union {
+            return val;
+        }
+
+        let target_variants = target_union
+            .get_union_variants()
+            .expect("INTERNAL COMPILER ERROR: coerce_to_union target is not a union");
+
+        if let Some(source_variants) = val_type.get_union_variants() {
+            let source_is_subset = source_variants
+                .iter()
+                .all(|sv| target_variants.iter().any(|tv| sv == tv));
+
+            if source_is_subset {
+                self.widen_union(val, source_variants, target_variants)
+            } else {
+                self.narrow_union(val, source_variants, target_variants)
+            }
+        } else {
+            self.wrap_in_union(val, target_variants)
+        }
+    }
+
+    pub fn resolve_phi(
+        &mut self,
+        block_id: BasicBlockId,
+        phi_id: ValueId,
+        place: &Place,
+        span: Span,
+    ) {
+        let predecessors: Vec<BasicBlockId> =
+            self.get_bb(block_id).predecessors.iter().cloned().collect();
+
+        let mut phi_sources = Vec::new();
+        let mut incoming_types = Vec::new();
+
+        for pred in &predecessors {
+            let val = self.read_place_from_block(*pred, place, span.clone());
+            phi_sources.push((*pred, val));
+            incoming_types.push(self.get_value_type(val).clone());
+        }
+
+        let unified_type = Type::make_union(incoming_types);
+
+        let final_sources = if unified_type.get_union_variants().is_some() {
+            let current_block = self.context.block_id;
+            let mut wrapped = HashSet::new();
+
+            for (pred_block, val) in phi_sources {
+                let coercion_block = self.get_coercion_block(pred_block, block_id);
+
+                self.use_basic_block(coercion_block);
+                let final_val = self.coerce_to_union(val, &unified_type);
+
+                wrapped.insert(PhiSource {
+                    from: coercion_block,
+                    value: final_val,
+                });
+            }
+
+            self.use_basic_block(current_block);
+            wrapped
+        } else {
+            phi_sources
+                .into_iter()
+                .map(|(pred, val)| PhiSource {
+                    from: pred,
+                    value: val,
+                })
+                .collect()
+        };
+
+        if let Some(ty) = self.program.value_types.get_mut(&phi_id) {
+            *ty = unified_type;
+        }
+
+        self.insert_phi(block_id, phi_id, final_sources);
     }
 
     pub fn new_value_id(&mut self, ty: Type) -> ValueId {
@@ -395,8 +369,8 @@ impl<'a> Builder<'a, InBlock> {
         let block_id = self.context.block_id;
         let incomplete = self.incomplete_phis.remove(&block_id).unwrap_or_default();
 
-        for (phi_id, variable, span) in incomplete {
-            self.resolve_phi(block_id, phi_id, variable, span);
+        for (phi_id, place, span) in incomplete {
+            self.resolve_phi(block_id, phi_id, &place, span);
         }
 
         self.bb_mut().sealed = true;

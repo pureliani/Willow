@@ -11,6 +11,7 @@ impl<'a> Builder<'a, InModule> {
             incomplete_phis: self.incomplete_phis,
             type_predicates: self.type_predicates,
             ptg: self.ptg,
+            aliases: self.aliases,
         }
     }
 

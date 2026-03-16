@@ -4,6 +4,7 @@ use crate::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
         types::{checked_declaration::CheckedDeclaration, checked_type::SpannedType},
+        utils::place::Place,
     },
 };
 
@@ -29,7 +30,13 @@ impl<'a> Builder<'a, InBlock> {
         let result = match decl {
             CheckedDeclaration::Function(_) => self.emit_const_fn(decl_id),
             CheckedDeclaration::Var(_) => {
-                self.read_variable(decl_id, self.context.block_id, identifier.span)
+                let place = self
+                    .aliases
+                    .get(&decl_id)
+                    .cloned()
+                    .unwrap_or(Place::Local(decl_id));
+
+                self.read_place(&place, identifier.span)
             }
             CheckedDeclaration::TypeAlias(_) => {
                 self.report_error_and_get_poison(SemanticError {

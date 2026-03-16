@@ -2,7 +2,7 @@ use crate::{
     ast::Span,
     mir::{
         builders::{Builder, InBlock, ValueId},
-        types::checked_type::{SpannedType, Type},
+        types::checked_type::SpannedType,
     },
 };
 
@@ -13,30 +13,6 @@ impl<'a> Builder<'a, InBlock> {
         value: bool,
         expected_type: Option<&SpannedType>,
     ) -> ValueId {
-        let literal = Type::Literal(LiteralType::Bool(value));
-
-        if let Some(et) = expected_type {
-            if et.kind == literal {
-                return self.emit_bool_literal(value);
-            }
-
-            if et.kind == Type::Bool {
-                return self.emit_bool(value);
-            }
-
-            if let Some(variants) = et.kind.get_narrowed_variants() {
-                if variants.contains(&literal) {
-                    let val = self.emit_bool_literal(value);
-                    return self.emit_wrap_in_union(val, &et.kind);
-                }
-
-                if variants.contains(&Type::Bool) {
-                    let val = self.emit_bool(value);
-                    return self.emit_wrap_in_union(val, &et.kind);
-                }
-            }
-        }
-
-        self.emit_bool_literal(value)
+        self.emit_bool(value)
     }
 }

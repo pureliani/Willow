@@ -6,7 +6,10 @@ use crate::{
     mir::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
-        types::{checked_declaration::CheckedDeclaration, checked_type::SpannedType},
+        types::{
+            checked_declaration::CheckedDeclaration,
+            checked_type::{SpannedType, Type},
+        },
     },
 };
 
@@ -68,7 +71,17 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::Identifier(ident) => {
                 let decl_id = self.current_scope.lookup(ident.name)?;
                 match self.program.declarations.get(&decl_id)? {
-                    CheckedDeclaration::Var(v) => Some(&v.constraint),
+                    CheckedDeclaration::Var(v) => {
+                        let constraint = self.get_value_type(v.stack_ptr);
+                        if let Type::Pointer(to) = constraint {
+                            Some(&SpannedType {
+                                kind: **to,
+                                span: v.constraint_span,
+                            })
+                        } else {
+                            panic!("INTERNAL COMPILER ERROR: Variables must be stack allocated")
+                        }
+                    }
                     _ => None,
                 }
             }

@@ -20,7 +20,7 @@ impl<'a> Builder<'a, InBlock> {
         let cond_id = self.build_expr(
             condition,
             Some(&SpannedType {
-                kind: Type::Bool,
+                kind: Type::Bool(None),
                 span: condition_span,
             }),
         );

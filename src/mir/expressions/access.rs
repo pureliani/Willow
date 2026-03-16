@@ -13,9 +13,13 @@ impl<'a> Builder<'a, InBlock> {
         field: IdentifierNode,
         expected_type: Option<&SpannedType>,
     ) -> ValueId {
-        let base_val = self.build_expr(left, None);
         let field_span = field.span.clone();
-        let field_val = self.emit_read_struct_field(base_val, field);
+        let base_ptr = self.build_expr(left, None);
+        let field_ptr = match self.try_get_field_ptr(base_ptr, &field, false) {
+            Ok(ptr) => ptr,
+            Err(e) => return self.report_error_and_get_poison(e),
+        };
+        let field_val = self.emit_load(field_ptr);
         self.check_expected(field_val, field_span, expected_type)
     }
 }

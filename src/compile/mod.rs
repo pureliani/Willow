@@ -160,6 +160,7 @@ impl Compiler {
         let mut current_defs = HashMap::new();
         let mut incomplete_phis = HashMap::new();
         let mut type_predicates = HashMap::new();
+        let mut aliases = HashMap::new();
 
         let mut program = Program {
             entry_path: Some(canonical_main.clone()),
@@ -180,6 +181,7 @@ impl Compiler {
             incomplete_phis: &mut incomplete_phis,
             type_predicates: &mut type_predicates,
             ptg: &mut global_ptg,
+            aliases: &mut aliases,
         };
 
         program_builder.build(modules_to_compile);

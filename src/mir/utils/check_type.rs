@@ -13,7 +13,7 @@ use crate::{
             checked_type::{SpannedType, StructKind, Type},
             ordered_float::{OrderedF32, OrderedF64},
         },
-        utils::scope::Scope,
+        utils::{layout::pack_struct, scope::Scope},
     },
 };
 
@@ -96,7 +96,10 @@ pub fn check_type_annotation(
         TypeAnnotationKind::ISize(lit) => Type::ISize(*lit),
         TypeAnnotationKind::F32(lit) => Type::F32(lit.map(OrderedF32)),
         TypeAnnotationKind::F64(lit) => Type::F64(lit.map(OrderedF64)),
-        TypeAnnotationKind::String(lit) => Type::Struct(StructKind::StringHeader(*lit)),
+        TypeAnnotationKind::String(lit) => {
+            let inner = Type::Struct(StructKind::StringHeader(*lit));
+            Type::Pointer(Box::new(inner))
+        }
         TypeAnnotationKind::Identifier(id) => {
             check_type_identifier_annotation(ctx, id.clone())
         }
@@ -107,7 +110,7 @@ pub fn check_type_annotation(
             let checked_params = check_params(ctx, params);
             let checked_return_type = check_type_annotation(ctx, return_type);
 
-            Type::Fn(FnType {
+            Type::Fn(FnType::Indirect {
                 params: checked_params,
                 return_type: Box::new(checked_return_type),
             })
@@ -123,11 +126,16 @@ pub fn check_type_annotation(
         }
         TypeAnnotationKind::List(item_type) => {
             let checked_item_type = check_type_annotation(ctx, item_type);
-            Type::List(Box::new(checked_item_type))
+            let inner = Box::new(Type::Struct(StructKind::ListHeader(Box::new(
+                checked_item_type.kind,
+            ))));
+            Type::Pointer(inner)
         }
         TypeAnnotationKind::Struct(items) => {
             let checked_field_types = check_params(ctx, items);
-            Type::Struct(checked_field_types)
+            let packed = pack_struct(StructKind::UserDefined(checked_field_types));
+            let inner = Box::new(Type::Struct(packed));
+            Type::Pointer(inner)
         }
     };
 

@@ -16,10 +16,7 @@ pub enum StructKind {
     UserDefined(Vec<CheckedParam>),
 
     /// { id: u16, value: TaglessUnion }
-    TaggedUnion {
-        base: BTreeSet<Type>,
-        narrowed: BTreeSet<Type>,
-    },
+    TaggedUnion(BTreeSet<Type>),
 
     /// { len: usize, cap: usize, ptr: ptr<T> }
     ListHeader(Box<Type>),
@@ -50,8 +47,8 @@ impl StructKind {
                     Type::Pointer(Box::new(Type::U8(None))),
                 ),
             ],
-            StructKind::TaggedUnion { base, .. } => {
-                if base.len() < 2 {
+            StructKind::TaggedUnion(variants) => {
+                if variants.len() < 2 {
                     panic!(
                         "INTERNAL COMPILER ERROR: Unflattened or empty Union detected. \
                          Always use Type::make_union()"
@@ -60,7 +57,7 @@ impl StructKind {
 
                 vec![
                     (COMMON_IDENTIFIERS.id, Type::U16(None)),
-                    (COMMON_IDENTIFIERS.val, Type::TaglessUnion(base.clone())),
+                    (COMMON_IDENTIFIERS.val, Type::TaglessUnion(variants.clone())),
                 ]
             }
         }
@@ -102,6 +99,14 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn unwrap_ptr(&self) -> &Type {
+        if let Type::Pointer(to) = self {
+            return to;
+        }
+
+        panic!("INTERNAL COMPILER ERROR: Called unwrap_ptr on non-pointer type")
+    }
+
     pub fn from_number_kind(val: &NumberKind) -> Type {
         match *val {
             NumberKind::I64(v) => Type::I64(Some(v)),
@@ -120,35 +125,28 @@ impl Type {
     }
 
     pub fn make_union(types: impl IntoIterator<Item = Type>) -> Type {
-        let mut base = BTreeSet::new();
-        let mut narrowed = BTreeSet::new();
+        let mut flat = BTreeSet::new();
 
         for ty in types {
             if matches!(ty, Type::Never) {
                 continue;
             }
-            if let Type::Struct(StructKind::TaggedUnion {
-                base: b,
-                narrowed: n,
-            }) = ty
-            {
-                base.extend(b);
-                narrowed.extend(n);
+            if let Type::Struct(StructKind::TaggedUnion(variants)) = ty {
+                flat.extend(variants);
             } else {
-                base.insert(ty.clone());
-                narrowed.insert(ty);
+                flat.insert(ty);
             }
         }
 
-        if base.is_empty() {
+        if flat.is_empty() {
             return Type::Never;
         }
 
-        if base.len() == 1 {
-            return base.into_iter().next().unwrap();
+        if flat.len() == 1 {
+            return flat.into_iter().next().unwrap();
         }
 
-        Type::Struct(StructKind::TaggedUnion { base, narrowed })
+        Type::Struct(StructKind::TaggedUnion(flat))
     }
 
     pub fn union(self, other: Type) -> Type {
@@ -178,26 +176,16 @@ impl Type {
         if matches!(self, Type::Never) {
             return BTreeSet::new();
         }
-        if let Type::Struct(StructKind::TaggedUnion { narrowed, .. }) = self {
-            return narrowed;
+        if let Type::Struct(StructKind::TaggedUnion(variants)) = self {
+            return variants;
         }
 
-        let mut set = BTreeSet::new();
-        set.insert(self);
-        set
+        BTreeSet::from([self])
     }
 
-    pub fn get_narrowed_variants(&self) -> Option<&BTreeSet<Type>> {
-        if let Type::Struct(StructKind::TaggedUnion { narrowed, .. }) = self {
-            Some(narrowed)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_base_variants(&self) -> Option<&BTreeSet<Type>> {
-        if let Type::Struct(StructKind::TaggedUnion { base, .. }) = self {
-            Some(base)
+    pub fn get_union_variants(&self) -> Option<&BTreeSet<Type>> {
+        if let Type::Struct(StructKind::TaggedUnion(variants)) = self {
+            Some(variants)
         } else {
             None
         }

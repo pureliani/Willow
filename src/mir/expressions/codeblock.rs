@@ -26,16 +26,14 @@ impl<'a> Builder<'a, InBlock> {
             ScopeKind::CodeBlock
         };
 
-        self.current_scope = self
-            .current_scope
-            .enter(scope_kind, codeblock.span.start);
+        self.current_scope = self.current_scope.enter(scope_kind, codeblock.span.start);
 
         self.build_statements(codeblock.statements);
         let result_id = if let Some(final_expr) = codeblock.final_expr {
             final_expr_span = final_expr.span.clone();
             self.build_expr(*final_expr, expected_type)
         } else {
-            self.emit_const_void()
+            self.emit_void()
         };
 
         self.current_scope = self

@@ -91,8 +91,8 @@ pub fn type_to_string_recursive(ty: &Type, visited_set: &mut HashSet<Type>) -> S
             StructKind::UserDefined(checked_params) => {
                 struct_to_string(checked_params, visited_set)
             }
-            StructKind::TaggedUnion { narrowed, .. } => {
-                union_variants_to_string(narrowed, visited_set)
+            StructKind::TaggedUnion(variants) => {
+                union_variants_to_string(variants, visited_set, true)
             }
             StructKind::ListHeader(item_type) => list_to_string(item_type, visited_set),
             StructKind::StringHeader(string_id) => {
@@ -103,8 +103,12 @@ pub fn type_to_string_recursive(ty: &Type, visited_set: &mut HashSet<Type>) -> S
             }
         },
         Type::Fn(fn_type) => fn_signature_to_string(fn_type, visited_set),
-        Type::Pointer(_) => todo!(),
-        Type::TaglessUnion(btree_set) => todo!(),
+        Type::Pointer(to) => {
+            format!("ptr<{}>", type_to_string_recursive(to, visited_set))
+        }
+        Type::TaglessUnion(variants) => {
+            union_variants_to_string(variants, visited_set, false)
+        }
     };
 
     visited_set.remove(ty);
@@ -131,12 +135,15 @@ fn struct_to_string(fields: &[CheckedParam], visited_set: &mut HashSet<Type>) ->
 fn union_variants_to_string(
     variants: &BTreeSet<Type>,
     visited_set: &mut HashSet<Type>,
+    is_tagged: bool,
 ) -> String {
+    let symbol = if is_tagged { "|" } else { "~" };
+
     variants
         .iter()
         .map(|tag| type_to_string_recursive(tag, visited_set))
         .collect::<Vec<String>>()
-        .join(" | ")
+        .join(symbol)
 }
 
 pub fn list_to_string(item_type: &Type, visited_set: &mut HashSet<Type>) -> String {
