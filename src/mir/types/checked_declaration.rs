@@ -5,9 +5,10 @@ use std::{
 
 use crate::{
     ast::{DeclarationId, IdentifierNode, Span},
+    compile::interner::TypeId,
     mir::{
         builders::{Function, ValueId},
-        types::checked_type::{SpannedType, Type},
+        types::checked_type::SpannedType,
     },
     parse::DocAnnotation,
 };
@@ -85,7 +86,7 @@ pub enum CheckedDeclaration {
 #[derive(Debug, Clone)]
 pub struct ParamMutation {
     pub param_index: usize,
-    pub exit_type: Type,
+    pub exit_type: TypeId,
 }
 
 #[derive(Debug, Clone, Default)]

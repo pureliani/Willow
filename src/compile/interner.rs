@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::RwLock};
 
-use crate::mir::types::checked_type::Type;
+use crate::{globals::TYPE_INTERNER, mir::types::checked_type::Type};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StringId(pub usize);
@@ -111,5 +111,11 @@ impl TypeInterner {
         let mut writer = self.state.write().unwrap();
         writer.forward.clear();
         writer.backward.clear();
+    }
+}
+
+impl TypeId {
+    pub fn as_type(&self) -> Type {
+        TYPE_INTERNER.resolve(*self)
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     ast::{IdentifierNode, Span},
-    compile::interner::StringId,
+    compile::interner::{StringId, TypeId},
     globals::{COMMON_IDENTIFIERS, STRING_INTERNER},
     mir::{
         builders::{Builder, InBlock, ValueId},
@@ -11,8 +11,8 @@ use crate::{
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn emit_stack_alloc(&mut self, ty: Type, count: usize) -> ValueId {
-        let dest = self.new_value_id(Type::Pointer(Box::new(ty)));
+    pub fn emit_stack_alloc(&mut self, ty: TypeId, count: usize) -> ValueId {
+        let dest = self.new_value_id(Type::Pointer(ty));
         self.push_instruction(Instruction::Memory(MemoryInstr::StackAlloc {
             dest,
             count,
@@ -20,8 +20,8 @@ impl<'a> Builder<'a, InBlock> {
         dest
     }
 
-    pub fn emit_heap_alloc(&mut self, ty: Type, count: ValueId) -> ValueId {
-        let dest = self.new_value_id(Type::Pointer(Box::new(ty)));
+    pub fn emit_heap_alloc(&mut self, ty: TypeId, count: ValueId) -> ValueId {
+        let dest = self.new_value_id(Type::Pointer(ty));
         self.push_instruction(Instruction::Memory(MemoryInstr::HeapAlloc {
             dest,
             count,
@@ -32,7 +32,7 @@ impl<'a> Builder<'a, InBlock> {
     pub fn emit_load(&mut self, ptr: ValueId) -> ValueId {
         let ptr_ty = self.get_value_type(ptr);
         let dest_ty = if let Type::Pointer(to) = ptr_ty {
-            *to.clone()
+            *to
         } else {
             panic!("INTERNAL COMPILER ERROR: Load expected pointer");
         };
@@ -62,7 +62,7 @@ impl<'a> Builder<'a, InBlock> {
         let val_ty = self.get_value_type(value).clone();
 
         if let Type::Pointer(to) = ptr_ty {
-            if val_ty != *to {
+            if val_ty != to {
                 panic!("INTERNAL COMPILER ERROR: Store instruction expected the provided value to match pointed to type");
             }
 

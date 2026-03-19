@@ -5,6 +5,7 @@ use crate::{
         expr::{BlockContents, Expr},
         Span,
     },
+    compile::interner::TypeId,
     mir::{
         builders::{BasicBlockId, Builder, InBlock, PhiSource, TypePredicate, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -141,7 +142,7 @@ impl<'a> Builder<'a, InBlock> {
     pub fn apply_type_predicate(
         &mut self,
         pred: &TypePredicate,
-        new_type: Type,
+        new_type: TypeId,
         span: Span,
     ) {
         let current_val = self.read_variable(pred.decl_id, self.context.block_id, span);

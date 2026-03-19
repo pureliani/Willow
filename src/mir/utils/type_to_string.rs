@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use crate::{
+    compile::interner::TypeId,
     globals::STRING_INTERNER,
     mir::types::{
         checked_declaration::{CheckedParam, FnType},
@@ -20,17 +21,20 @@ pub fn token_kind_to_string(kind: &TokenKind) -> String {
     }
 }
 
-pub fn type_to_string(ty: &Type) -> String {
+pub fn type_to_string(ty_id: TypeId) -> String {
     let mut visited_set = HashSet::new();
-    type_to_string_recursive(ty, &mut visited_set)
+    type_to_string_recursive(ty_id, &mut visited_set)
 }
 
-pub fn type_to_string_recursive(ty: &Type, visited_set: &mut HashSet<Type>) -> String {
-    if !visited_set.insert(ty.clone()) {
+pub fn type_to_string_recursive(
+    ty_id: TypeId,
+    visited_set: &mut HashSet<TypeId>,
+) -> String {
+    if !visited_set.insert(ty_id) {
         return "...".to_string();
     }
 
-    let result = match ty {
+    let result = match ty_id.as_type() {
         Type::Void => String::from("void"),
         Type::Null => String::from("null"),
         Type::Unknown => String::from("unknown"),
@@ -89,10 +93,10 @@ pub fn type_to_string_recursive(ty: &Type, visited_set: &mut HashSet<Type>) -> S
         }
         Type::Struct(s) => match s {
             StructKind::UserDefined(checked_params) => {
-                struct_to_string(checked_params, visited_set)
+                struct_to_string(&checked_params, visited_set)
             }
             StructKind::TaggedUnion(variants) => {
-                union_variants_to_string(variants, visited_set, true)
+                union_variants_to_string(&variants, visited_set, true)
             }
             StructKind::ListHeader(item_type) => list_to_string(item_type, visited_set),
             StructKind::StringHeader(string_id) => {
@@ -102,28 +106,31 @@ pub fn type_to_string_recursive(ty: &Type, visited_set: &mut HashSet<Type>) -> S
                 })
             }
         },
-        Type::Fn(fn_type) => fn_signature_to_string(fn_type, visited_set),
+        Type::Fn(fn_type) => fn_signature_to_string(&fn_type, visited_set),
         Type::Pointer(to) => {
             format!("ptr<{}>", type_to_string_recursive(to, visited_set))
         }
         Type::TaglessUnion(variants) => {
-            union_variants_to_string(variants, visited_set, false)
+            union_variants_to_string(&variants, visited_set, false)
         }
     };
 
-    visited_set.remove(ty);
+    visited_set.remove(&ty_id);
 
     result
 }
 
-fn struct_to_string(fields: &[CheckedParam], visited_set: &mut HashSet<Type>) -> String {
+fn struct_to_string(
+    fields: &[CheckedParam],
+    visited_set: &mut HashSet<TypeId>,
+) -> String {
     let fields_str = fields
         .iter()
         .map(|f| {
             format!(
                 "{}: {}",
                 STRING_INTERNER.resolve(f.identifier.name),
-                type_to_string_recursive(&f.ty.kind, visited_set)
+                type_to_string_recursive(f.ty.id, visited_set)
             )
         })
         .collect::<Vec<String>>()
@@ -133,25 +140,25 @@ fn struct_to_string(fields: &[CheckedParam], visited_set: &mut HashSet<Type>) ->
 }
 
 fn union_variants_to_string(
-    variants: &BTreeSet<Type>,
-    visited_set: &mut HashSet<Type>,
+    variants: &BTreeSet<TypeId>,
+    visited_set: &mut HashSet<TypeId>,
     is_tagged: bool,
 ) -> String {
     let symbol = if is_tagged { "|" } else { "~" };
 
     variants
         .iter()
-        .map(|tag| type_to_string_recursive(tag, visited_set))
+        .map(|tag| type_to_string_recursive(*tag, visited_set))
         .collect::<Vec<String>>()
         .join(symbol)
 }
 
-pub fn list_to_string(item_type: &Type, visited_set: &mut HashSet<Type>) -> String {
+pub fn list_to_string(item_type: TypeId, visited_set: &mut HashSet<TypeId>) -> String {
     let item_type_string = type_to_string_recursive(item_type, visited_set);
     format!("{}[]", item_type_string)
 }
 
-fn fn_signature_to_string(fn_type: &FnType, visited_set: &mut HashSet<Type>) -> String {
+fn fn_signature_to_string(fn_type: &FnType, visited_set: &mut HashSet<TypeId>) -> String {
     match fn_type {
         FnType::Direct(id) => format!("fn_{}", id.0),
         FnType::Indirect {
@@ -164,14 +171,13 @@ fn fn_signature_to_string(fn_type: &FnType, visited_set: &mut HashSet<Type>) -> 
                     format!(
                         "{}: {}",
                         STRING_INTERNER.resolve(p.identifier.name),
-                        type_to_string_recursive(&p.ty.kind, visited_set)
+                        type_to_string_recursive(p.ty.id, visited_set)
                     )
                 })
                 .collect::<Vec<String>>()
                 .join(", ");
 
-            let return_type_str =
-                type_to_string_recursive(&return_type.kind, visited_set);
+            let return_type_str = type_to_string_recursive(return_type.id, visited_set);
 
             format!("fn({}): {}", params_str, return_type_str)
         }

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{any::TypeId, collections::HashSet};
 
 use crate::{
     ast::{IdentifierNode, ModulePath, Span},
@@ -35,8 +35,8 @@ pub enum SemanticErrorKind {
     MixedSignedAndUnsigned,
     MixedFloatAndInteger,
     CannotCompareType {
-        of: Type,
-        to: Type,
+        of: TypeId,
+        to: TypeId,
     },
     UndeclaredIdentifier(IdentifierNode),
     UndeclaredType(IdentifierNode),
@@ -46,15 +46,15 @@ pub enum SemanticErrorKind {
     InvalidLValue,
     CannotGetLen(Type),
     TypeMismatch {
-        expected: Type,
-        received: Type,
+        expected: TypeId,
+        received: TypeId,
     },
     ReturnTypeMismatch {
-        expected: Type,
-        received: Type,
+        expected: TypeId,
+        received: TypeId,
     },
-    CannotAccess(Type),
-    CannotStaticAccess(Type),
+    CannotAccess(TypeId),
+    CannotStaticAccess(TypeId),
     AccessToUndefinedField(IdentifierNode),
     AccessToUndefinedStaticField(IdentifierNode),
     FnArgumentCountMismatch {
@@ -67,8 +67,8 @@ pub enum SemanticErrorKind {
     TypeAliasMustBeDeclaredAtTopLevel,
     IfExpressionMissingElse,
     CannotCastType {
-        source_type: Type,
-        target_type: Type,
+        source_type: TypeId,
+        target_type: TypeId,
     },
     TryExplicitCast,
     SymbolNotExported {

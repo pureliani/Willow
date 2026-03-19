@@ -3,6 +3,7 @@ use crate::{
         expr::{Expr, ExprKind},
         DeclarationId, Span,
     },
+    compile::interner::TypeId,
     mir::{
         builders::{Builder, ExpectBody, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -132,7 +133,7 @@ impl<'a> Builder<'a, InBlock> {
     fn apply_effect_mutation(
         &mut self,
         decl_id: DeclarationId,
-        new_type: Type,
+        new_type: TypeId,
         span: Span,
     ) {
         let current_val =

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{DeclarationId, IdentifierNode, ModulePath, Span},
+    compile::interner::TypeId,
     mir::{
         errors::SemanticError,
         instructions::{Instruction, Terminator},
@@ -40,7 +41,7 @@ pub struct LoopJumpTargets {
 
 pub struct Program {
     pub modules: HashMap<ModulePath, Module>,
-    pub value_types: HashMap<ValueId, Type>,
+    pub value_types: HashMap<ValueId, TypeId>,
     pub declarations: HashMap<DeclarationId, CheckedDeclaration>,
     pub entry_path: Option<ModulePath>,
 }

@@ -4,7 +4,7 @@ use crate::{
         type_annotation::TypeAnnotation,
         DeclarationId, Span,
     },
-    compile::interner::StringId,
+    compile::interner::{StringId, TypeId},
     mir::{
         builders::{Builder, InBlock, TypePredicate, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -50,7 +50,7 @@ impl<'a> Builder<'a, InBlock> {
     pub fn replace_field_type(
         struct_ty: &Type,
         field: StringId,
-        new_field_ty: Type,
+        new_field_ty: TypeId,
     ) -> Type {
         if let Type::Struct(fields) = struct_ty {
             let new_fields = fields
@@ -60,7 +60,7 @@ impl<'a> Builder<'a, InBlock> {
                         CheckedParam {
                             identifier: f.identifier.clone(),
                             ty: SpannedType {
-                                kind: new_field_ty.clone(),
+                                id: new_field_ty,
                                 span: Span::default(), // TODO: fix this later
                             },
                         }
