@@ -14,23 +14,23 @@ use crate::{
 impl<'a> Builder<'a, InBlock> {
     pub fn emit_number(&mut self, val: NumberKind) -> ValueId {
         let ty = Type::from_number_kind(&val);
-        self.new_value_id(ty)
+        self.new_value_id(ty.id())
     }
 
     pub fn emit_bool(&mut self, val: bool) -> ValueId {
-        self.new_value_id(Type::Bool(Some(val)))
+        self.new_value_id(Type::Bool(Some(val)).id())
     }
 
     pub fn emit_string(&mut self, val: StringId) -> ValueId {
-        self.new_value_id(Type::Struct(StructKind::StringHeader(Some(val))))
+        self.new_value_id(Type::Struct(StructKind::StringHeader(Some(val))).id())
     }
 
     pub fn emit_void(&mut self) -> ValueId {
-        self.new_value_id(Type::Void)
+        self.new_value_id(Type::Void.id())
     }
 
     pub fn emit_null(&mut self) -> ValueId {
-        self.new_value_id(Type::Null)
+        self.new_value_id(Type::Null.id())
     }
 
     pub fn emit_const_fn(&mut self, decl_id: DeclarationId) -> ValueId {
@@ -45,7 +45,7 @@ impl<'a> Builder<'a, InBlock> {
         }
 
         let ty = Type::Fn(FnType::Direct(decl_id));
-        let dest = self.new_value_id(ty);
+        let dest = self.new_value_id(ty.id());
         dest
     }
 }

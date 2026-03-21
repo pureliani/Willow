@@ -5,7 +5,7 @@ use crate::{
         expr::{Expr, ExprKind},
         DeclarationId, IdentifierNode, Span,
     },
-    compile::interner::StringId,
+    compile::interner::{StringId, TypeId},
     mir::{
         builders::{BasicBlockId, Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -83,7 +83,7 @@ impl<'a> Builder<'a, InBlock> {
                 let current_val = self.read_place(&base, field.span.clone());
                 let current_type = self.get_value_type(current_val).clone();
 
-                self.validate_field_access(&current_type, &field)?;
+                self.validate_field_access(current_type, &field)?;
 
                 Ok(Place::Field(Box::new(base), field.name))
             }
@@ -99,11 +99,11 @@ impl<'a> Builder<'a, InBlock> {
     /// are not user-accessible.
     fn validate_field_access(
         &self,
-        base_type: &Type,
+        base_type: TypeId,
         field: &IdentifierNode,
     ) -> Result<(), SemanticError> {
-        let struct_kind = match base_type {
-            Type::Pointer(inner) => match &**inner {
+        let struct_kind = match base_type.ty() {
+            Type::Pointer(inner) => match inner.ty() {
                 Type::Struct(s) => s,
                 _ => return Ok(()),
             },
@@ -159,7 +159,7 @@ impl<'a> Builder<'a, InBlock> {
                  neither defined the place nor had the predecessors"
             );
         } else {
-            let val_id = self.new_value_id(Type::Unknown);
+            let val_id = self.new_value_id(Type::Unknown.id());
 
             self.current_defs
                 .entry(block_id)
@@ -193,44 +193,41 @@ impl<'a> Builder<'a, InBlock> {
             .insert(canonical, value);
     }
 
-    pub fn type_of_place(&self, place: &Place) -> Type {
+    pub fn type_of_place(&self, place: &Place) -> TypeId {
         match place {
             Place::Local(decl_id) => {
                 let decl = self.program.declarations.get(decl_id).unwrap();
                 match decl {
                     CheckedDeclaration::Var(v) => {
-                        self.get_value_type(v.stack_ptr).unwrap_ptr().clone()
+                        self.get_value_type(v.stack_ptr).ty().unwrap_ptr()
                     }
-                    CheckedDeclaration::Function(f) => Type::Fn(FnType::Direct(f.id)),
+                    CheckedDeclaration::Function(f) => {
+                        Type::Fn(FnType::Direct(f.id)).id()
+                    }
                     _ => panic!(),
                 }
             }
             Place::Field(base, field) => {
                 let base_ty = self.type_of_place(base);
-                self.type_of_field(&base_ty, *field).expect(
+                self.type_of_field(base_ty, *field).expect(
                     "INTERNAL COMPILER ERROR: Expected Place::Field to have a type",
                 )
             }
-            Place::Temporary(val_id) => self
-                .program
-                .value_types
-                .get(val_id)
-                .expect(
-                    "INTERNAL COMPILER ERROR: Expected Place::Temporary to have a type",
-                )
-                .clone(),
+            Place::Temporary(val_id) => *self.program.value_types.get(val_id).expect(
+                "INTERNAL COMPILER ERROR: Expected Place::Temporary to have a type",
+            ),
         }
     }
 
-    fn type_of_field(&self, base_ty: &Type, field: StringId) -> Option<Type> {
+    fn type_of_field(&self, base_ty: TypeId, field: StringId) -> Option<TypeId> {
         use Type::*;
 
-        let base_inner = match base_ty {
+        let base_inner = match base_ty.ty() {
             Pointer(inner) => inner,
             _ => return None,
         };
 
-        let struct_kind = match base_inner.as_ref() {
+        let struct_kind = match base_inner.ty() {
             Struct(s) => s,
             _ => return None,
         };

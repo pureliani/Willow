@@ -7,7 +7,7 @@ use crate::mir::{
 
 impl<'a> Builder<'a, InBlock> {
     fn emit_ieq(&mut self, lhs: ValueId, rhs: ValueId) -> ValueId {
-        let dest = self.new_value_id(Type::Bool(None).id().id());
+        let dest = self.new_value_id(Type::Bool(None).id());
         self.push_instruction(Instruction::Comp(CompInstr::IEq { dest, lhs, rhs }));
         dest
     }
@@ -113,7 +113,7 @@ impl<'a> Builder<'a, InBlock> {
     ) -> ValueId {
         let condition_type = self.get_value_type(condition);
 
-        if !matches!(condition_type, &Type::Bool(_)) {
+        if !matches!(condition_type.ty(), Type::Bool(_)) {
             panic!(
                 "INTERNAL COMPILER ERROR: Select instruction expected the condition to \
                  be a boolean value"
@@ -152,9 +152,9 @@ impl<'a> Builder<'a, InBlock> {
             "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
         );
 
-        if is_float(lhs_ty) {
+        if is_float(&lhs_ty.ty()) {
             self.emit_feq(lhs, rhs)
-        } else if is_integer(lhs_ty) {
+        } else if is_integer(&lhs_ty.ty()) {
             self.emit_ieq(lhs, rhs)
         } else {
             panic!("INTERNAL COMPILER ERROR: Cannot use equality `=` comparison operator on this type");
@@ -172,9 +172,9 @@ impl<'a> Builder<'a, InBlock> {
             "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
         );
 
-        if is_float(lhs_ty) {
+        if is_float(&lhs_ty.ty()) {
             self.emit_fneq(lhs, rhs)
-        } else if is_integer(lhs_ty) {
+        } else if is_integer(&lhs_ty.ty()) {
             self.emit_ineq(lhs, rhs)
         } else {
             panic!("INTERNAL COMPILER ERROR: Cannot use inequality `!=` comparison operator on this type");
@@ -192,11 +192,11 @@ impl<'a> Builder<'a, InBlock> {
             "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
         );
 
-        if is_float(&lhs_ty) {
+        if is_float(&lhs_ty.ty()) {
             self.emit_flt(lhs, rhs)
-        } else if is_signed(&lhs_ty) {
+        } else if is_signed(&lhs_ty.ty()) {
             self.emit_slt(lhs, rhs)
-        } else if !is_signed(&lhs_ty) {
+        } else if !is_signed(&lhs_ty.ty()) {
             self.emit_ult(lhs, rhs)
         } else {
             panic!("INTERNAL COMPILER ERROR: Cannot use less-than `<` comparison operator on this type")
@@ -214,11 +214,11 @@ impl<'a> Builder<'a, InBlock> {
             "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
         );
 
-        if is_float(&lhs_ty) {
+        if is_float(&lhs_ty.ty()) {
             self.emit_flte(lhs, rhs)
-        } else if is_signed(&lhs_ty) {
+        } else if is_signed(&lhs_ty.ty()) {
             self.emit_slte(lhs, rhs)
-        } else if !is_signed(&lhs_ty) {
+        } else if !is_signed(&lhs_ty.ty()) {
             self.emit_ulte(lhs, rhs)
         } else {
             panic!("INTERNAL COMPILER ERROR: Cannot use less-than-or-equal `<=` comparison operator on this type")
@@ -236,11 +236,11 @@ impl<'a> Builder<'a, InBlock> {
             "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
         );
 
-        if is_float(&lhs_ty) {
+        if is_float(&lhs_ty.ty()) {
             self.emit_fgt(lhs, rhs)
-        } else if is_signed(&lhs_ty) {
+        } else if is_signed(&lhs_ty.ty()) {
             self.emit_sgt(lhs, rhs)
-        } else if !is_signed(&lhs_ty) {
+        } else if !is_signed(&lhs_ty.ty()) {
             self.emit_ugt(lhs, rhs)
         } else {
             panic!("INTERNAL COMPILER ERROR: Cannot use greater-than `>` comparison operator on this type")
@@ -258,11 +258,11 @@ impl<'a> Builder<'a, InBlock> {
             "INTERNAL COMPILER ERROR: Expected lhs and rhs types to match"
         );
 
-        if is_float(&lhs_ty) {
+        if is_float(&lhs_ty.ty()) {
             self.emit_fgte(lhs, rhs)
-        } else if is_signed(&lhs_ty) {
+        } else if is_signed(&lhs_ty.ty()) {
             self.emit_sgte(lhs, rhs)
-        } else if !is_signed(&lhs_ty) {
+        } else if !is_signed(&lhs_ty.ty()) {
             self.emit_ugte(lhs, rhs)
         } else {
             panic!("INTERNAL COMPILER ERROR: Cannot use greater-than-or-equal `>=` comparison operator on this type")
