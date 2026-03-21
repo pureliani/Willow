@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use lilac::compile::Compiler;
+use willow::compile::Compiler;
 
 #[derive(Parser)]
-#[command(name = "lilac", about = "The Lilac compiler", version)]
+#[command(name = "willow", about = "The willow compiler", version)]
 struct Cli {
-    /// Path to the entry source file (.li)
+    /// Path to the entry source file (.wl)
     #[arg(value_parser = validate_input_extension, required_unless_present = "print_targets")]
     input: Option<PathBuf>,
 
@@ -65,7 +65,7 @@ fn main() {
         PathBuf::from(stem)
     });
 
-    let options = lilac::compile::CompileOptions {
+    let options = willow::compile::CompileOptions {
         input,
         output,
         target: cli.target,
@@ -82,8 +82,8 @@ fn main() {
 fn validate_input_extension(s: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(s);
     match path.extension().and_then(|e| e.to_str()) {
-        Some("li") => Ok(path),
-        _ => Err("entry file must have a .li extension".to_string()),
+        Some("wl") => Ok(path),
+        _ => Err("entry file must have a .wl extension".to_string()),
     }
 }
 

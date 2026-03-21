@@ -1,4 +1,0 @@
-
-fn foo(): string {
-    "foo!"
-}
