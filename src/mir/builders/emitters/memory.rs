@@ -11,8 +11,9 @@ use crate::{
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn emit_stack_alloc(&mut self, ty: TypeId, count: usize) -> ValueId {
-        let dest = self.new_value_id(Type::Pointer(ty));
+    pub fn emit_stack_alloc(&mut self, value_type: TypeId, count: usize) -> ValueId {
+        let ptr_ty = self.types.ptr(value_type);
+        let dest = self.new_value_id(ptr_ty);
         self.push_instruction(Instruction::Memory(MemoryInstr::StackAlloc {
             dest,
             count,
@@ -20,8 +21,9 @@ impl<'a> Builder<'a, InBlock> {
         dest
     }
 
-    pub fn emit_heap_alloc(&mut self, ty: TypeId, count: ValueId) -> ValueId {
-        let dest = self.new_value_id(Type::Pointer(ty));
+    pub fn emit_heap_alloc(&mut self, value_type: TypeId, count: ValueId) -> ValueId {
+        let ptr_ty = self.types.ptr(value_type);
+        let dest = self.new_value_id(ptr_ty);
         self.push_instruction(Instruction::Memory(MemoryInstr::HeapAlloc {
             dest,
             count,
@@ -31,11 +33,7 @@ impl<'a> Builder<'a, InBlock> {
 
     pub fn emit_load(&mut self, ptr: ValueId) -> ValueId {
         let ptr_ty = self.get_value_type(ptr);
-        let dest_ty = if let Type::Pointer(to) = ptr_ty {
-            *to
-        } else {
-            panic!("INTERNAL COMPILER ERROR: Load expected pointer");
-        };
+        let dest_ty = self.types.unwrap_ptr(ptr_ty);
 
         let dest = self.new_value_id(dest_ty);
         self.push_instruction(Instruction::Memory(MemoryInstr::Load { dest, ptr }));
@@ -58,18 +56,15 @@ impl<'a> Builder<'a, InBlock> {
     }
 
     pub fn emit_store(&mut self, ptr: ValueId, value: ValueId) {
-        let ptr_ty = self.get_value_type(ptr).clone();
-        let val_ty = self.get_value_type(value).clone();
+        let ptr_ty = self.get_value_type(ptr);
+        let value_type = self.get_value_type(value);
+        let expected_type = self.types.unwrap_ptr(ptr_ty);
 
-        if let Type::Pointer(to) = ptr_ty {
-            if val_ty != to {
-                panic!("INTERNAL COMPILER ERROR: Store instruction expected the provided value to match pointed to type");
-            }
+        if value_type != expected_type {
+            panic!("INTERNAL COMPILER ERROR: Store instruction expected the provided value to match pointed to type");
+        }
 
-            self.push_instruction(Instruction::Memory(MemoryInstr::Store { ptr, value }));
-        } else {
-            panic!("INTERNAL COMPILER ERROR: Store instruction expected a pointer");
-        };
+        self.push_instruction(Instruction::Memory(MemoryInstr::Store { ptr, value }));
     }
 
     /// offset = ptr<T> + index * sizeof(T)
@@ -135,7 +130,8 @@ impl<'a> Builder<'a, InBlock> {
                 });
             };
 
-        let dest = self.new_value_id(Type::Pointer(Box::new(field_type)));
+        let field_ptr_ty = self.types.ptr(field_type);
+        let dest = self.new_value_id(field_ptr_ty);
 
         self.push_instruction(Instruction::Memory(MemoryInstr::GetFieldPtr {
             dest,

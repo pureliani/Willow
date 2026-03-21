@@ -3,7 +3,6 @@ pub mod check_type;
 pub mod dump;
 pub mod get_poison;
 pub mod layout;
-pub mod numeric;
 pub mod place;
 pub mod points_to;
 pub mod scope;

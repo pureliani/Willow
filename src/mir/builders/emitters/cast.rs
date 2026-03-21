@@ -3,7 +3,6 @@ use crate::{
     mir::{
         builders::{Builder, InBlock, ValueId},
         instructions::{CastInstr, Instruction},
-        types::checked_type::Type,
         utils::type_to_string::type_to_string,
     },
 };
@@ -80,11 +79,9 @@ impl<'a> Builder<'a, InBlock> {
     }
 
     pub fn emit_bitcast_unsafe(&mut self, src: ValueId, target_ty: TypeId) -> ValueId {
-        let src_ty = self.get_value_type(src).ty();
+        let src_ty = self.get_value_type(src);
 
-        if !matches!(src_ty, Type::Pointer(_))
-            || !matches!(target_ty.ty(), Type::Pointer(_))
-        {
+        if !self.types.is_pointer(src_ty) || !self.types.is_pointer(target_ty) {
             panic!(
                 "INTERNAL COMPILER ERROR: emit_bitcast_unsafe should only be used for \
                  pointer-to-pointer casts"

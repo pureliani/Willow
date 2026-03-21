@@ -47,15 +47,15 @@ impl<'a> Builder<'a, InBlock> {
 
             let condition_span = condition.span.clone();
             let expected_condition_type = Some(SpannedType {
+                id: Type::Bool(None).id(),
                 span: condition_span.clone(),
-                kind: Type::Bool,
             });
 
             let cond_id = self.build_expr(*condition, expected_condition_type.as_ref());
             let cond_ty = self.get_value_type(cond_id);
 
-            if cond_ty == &Type::Unknown {
-                return self.new_value_id(Type::Unknown);
+            if cond_ty == Type::Unknown.id() {
+                return self.new_value_id(Type::Unknown.id());
             }
 
             let then_block_id = self.as_fn().new_bb();

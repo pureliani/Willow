@@ -1,8 +1,8 @@
-use std::{any::TypeId, collections::HashSet};
+use std::collections::HashSet;
 
 use crate::{
     ast::{IdentifierNode, ModulePath, Span},
-    compile::interner::StringId,
+    compile::interner::{StringId, TypeId},
     mir::{types::checked_type::Type, utils::points_to::PathSegment},
 };
 
@@ -18,18 +18,18 @@ pub enum SemanticErrorKind {
     MainFunctionCannotHaveParameters,
     MainFunctionInvalidReturnType,
     MainFunctionMustBeInEntryFile,
-    CannotNarrowNonUnion(Type),
+    CannotNarrowNonUnion(TypeId),
     ValuedTagInIsExpression,
     UnreachableCode,
     DuplicateIdentifier(IdentifierNode),
-    CannotIndex(Type),
+    CannotIndex(TypeId),
     FromStatementMustBeDeclaredAtTopLevel,
     ModuleNotFound(ModulePath),
     CannotDeclareGlobalVariable,
     DuplicateStructFieldInitializer(IdentifierNode),
     UnknownStructFieldInitializer(IdentifierNode),
     MissingStructFieldInitializers(HashSet<StringId>),
-    CannotCall(Type),
+    CannotCall(TypeId),
     ExpectedANumericOperand,
     ExpectedASignedNumericOperand,
     MixedSignedAndUnsigned,

@@ -27,6 +27,7 @@ impl<'a> Builder<'a, InBlock> {
             ptg: self.ptg,
             incomplete_phis: self.incomplete_phis,
             type_predicates: self.type_predicates,
+            types: self.types,
         }
     }
 
@@ -43,6 +44,7 @@ impl<'a> Builder<'a, InBlock> {
             ptg: self.ptg,
             incomplete_phis: self.incomplete_phis,
             type_predicates: self.type_predicates,
+            types: self.types,
         }
     }
 
@@ -60,6 +62,7 @@ impl<'a> Builder<'a, InBlock> {
             ptg: self.ptg,
             incomplete_phis: self.incomplete_phis,
             type_predicates: self.type_predicates,
+            types: self.types,
         }
     }
 
@@ -262,14 +265,16 @@ impl<'a> Builder<'a, InBlock> {
     /// Coerces a value to match a union type by wrapping, widening, or
     /// narrowing as needed. Must be called with `self.context.block_id`
     /// set to the block where the coercion instructions should be emitted.
-    pub fn coerce_to_union(&mut self, val: ValueId, target_union: &Type) -> ValueId {
+    pub fn coerce_to_union(&mut self, val: ValueId, target_union: TypeId) -> ValueId {
         let val_type = self.get_value_type(val).clone();
 
-        if val_type == *target_union {
+        if val_type == target_union {
             return val;
         }
 
-        let target_variants = target_union
+        let target_variants = self
+            .types
+            .resolve(target_union)
             .get_union_variants()
             .expect("INTERNAL COMPILER ERROR: coerce_to_union target is not a union");
 

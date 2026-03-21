@@ -2,10 +2,10 @@ use std::collections::HashSet;
 
 use crate::{
     ast::Span,
+    compile::interner::TypeId,
     mir::{
         builders::{BasicBlockId, Builder, InBlock, PhiSource, TypePredicate, ValueId},
         instructions::{CallInstr, Instruction, Terminator},
-        types::checked_type::Type,
     },
 };
 
@@ -32,7 +32,7 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         func: ValueId,
         args: Vec<ValueId>,
-        return_type: Type,
+        return_type: TypeId,
     ) -> ValueId {
         let dest = self.new_value_id(return_type);
         self.push_instruction(Instruction::Call(CallInstr { dest, func, args }));
@@ -113,7 +113,8 @@ impl<'a> Builder<'a, InBlock> {
         self.seal_block(merge_block);
         self.use_basic_block(merge_block);
 
-        let phi_id = self.new_value_id(Type::Bool(None));
+        let bool_ty = self.types.bool(None);
+        let phi_id = self.new_value_id(bool_ty);
         let phi_sources = HashSet::from([
             PhiSource {
                 from: left_block,
@@ -173,7 +174,8 @@ impl<'a> Builder<'a, InBlock> {
         self.seal_block(merge_block);
         self.use_basic_block(merge_block);
 
-        let phi_id = self.new_value_id(Type::Bool(None));
+        let bool_ty = self.types.bool(None);
+        let phi_id = self.new_value_id(bool_ty);
         let phi_sources = HashSet::from([
             PhiSource {
                 from: left_block,

@@ -304,9 +304,9 @@ impl Compiler {
                                 };
 
                             let passed_str =
-                                format_full_path(passed_arg_span, passed_path);
+                                format_full_path(&passed_arg_span, &passed_path);
                             let aliased_str =
-                                format_full_path(aliased_arg_span, aliased_path);
+                                format_full_path(&aliased_arg_span, &aliased_path);
 
                             diag.with_message("Argument aliasing detected").with_labels(
                                 vec![Label::primary(file_id, range).with_message(
@@ -322,7 +322,7 @@ impl Compiler {
                             diag.with_message("Cannot get length")
                         }
                         SemanticErrorKind::CannotNarrowNonUnion(ty) => {
-                            let type_str = type_to_string(ty);
+                            let type_str = type_to_string(*ty);
                             diag.with_message("Redundant type check").with_labels(vec![
                                 Label::primary(file_id, range).with_message(format!(
                                     "Value is already `{}`, `::is()` only works on \
@@ -354,8 +354,8 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Cannot compare `{}` to `{}`",
-                                    type_to_string(of),
-                                    type_to_string(to)
+                                    type_to_string(*of),
+                                    type_to_string(*to)
                                 ))]),
                         SemanticErrorKind::UndeclaredIdentifier(id) => {
                             let name = STRING_INTERNER.resolve(id.name);
@@ -377,8 +377,8 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Expected `{}`, found `{}`",
-                                    type_to_string(expected),
-                                    type_to_string(received)
+                                    type_to_string(*expected),
+                                    type_to_string(*received)
                                 ))]),
                         SemanticErrorKind::ReturnTypeMismatch { expected, received } => {
                             diag.with_message("Function return type mismatch")
@@ -386,8 +386,8 @@ impl Compiler {
                                     .with_message(format!(
                                         "Expected the returned value to have a type \
                                          that is assignable to `{}`, but found `{}`",
-                                        type_to_string(expected),
-                                        type_to_string(received)
+                                        type_to_string(*expected),
+                                        type_to_string(*received)
                                     ))])
                         }
                         SemanticErrorKind::ModuleNotFound(path_buf) => diag
@@ -436,7 +436,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Type `{}` cannot be indexed",
-                                    type_to_string(ty)
+                                    type_to_string(*ty)
                                 ))]),
                         SemanticErrorKind::FromStatementMustBeDeclaredAtTopLevel => diag
                             .with_message("Invalid import location")
@@ -498,7 +498,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Cannot use the function-call operator on type `{}`",
-                                    type_to_string(target)
+                                    type_to_string(*target)
                                 ))]),
                         SemanticErrorKind::ReturnKeywordOutsideFunction => diag
                             .with_message(
@@ -534,7 +534,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Cannot use the access operator on the type `{}`",
-                                    type_to_string(target)
+                                    type_to_string(*target)
                                 ))]),
                         SemanticErrorKind::CannotStaticAccess(_) => diag
                             .with_message("Cannot access static field")
@@ -610,8 +610,8 @@ impl Compiler {
                         } => diag.with_message("Invalid type cast").with_labels(vec![
                             Label::primary(file_id, range).with_message(format!(
                                 "Cannot cast type `{}` to `{}`",
-                                type_to_string(source_type),
-                                type_to_string(target_type)
+                                type_to_string(*source_type),
+                                type_to_string(*target_type)
                             )),
                         ]),
                         SemanticErrorKind::ClosuresNotSupportedYet => diag

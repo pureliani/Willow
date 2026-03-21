@@ -8,6 +8,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+// TODO: re-implement CodeGenerator
 use crate::codegen::CodeGenerator;
 
 pub mod file_cache;
@@ -51,6 +52,7 @@ impl CompileOptions {
     }
 }
 
+use crate::compile::interner::TypeInterner;
 use crate::{
     ast::{
         decl::Declaration,
@@ -161,6 +163,7 @@ impl Compiler {
         let mut incomplete_phis = HashMap::new();
         let mut type_predicates = HashMap::new();
         let mut aliases = HashMap::new();
+        let mut types = TypeInterner::default();
 
         let mut program = Program {
             entry_path: Some(canonical_main.clone()),
@@ -182,6 +185,7 @@ impl Compiler {
             type_predicates: &mut type_predicates,
             ptg: &mut global_ptg,
             aliases: &mut aliases,
+            types: &mut types,
         };
 
         program_builder.build(modules_to_compile);

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{DeclarationId, IdentifierNode, ModulePath, Span},
-    compile::interner::TypeId,
+    compile::interner::{TypeId, TypeInterner},
     mir::{
         errors::SemanticError,
         instructions::{Instruction, Terminator},
@@ -133,6 +133,7 @@ pub trait BuilderContext {}
 pub struct Builder<'a, C: BuilderContext> {
     pub context: C,
     pub program: &'a mut Program,
+    pub types: &'a mut TypeInterner,
 
     pub errors: &'a mut Vec<SemanticError>,
     pub current_scope: Scope,

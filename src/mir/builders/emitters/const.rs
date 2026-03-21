@@ -13,24 +13,30 @@ use crate::{
 
 impl<'a> Builder<'a, InBlock> {
     pub fn emit_number(&mut self, val: NumberKind) -> ValueId {
-        let ty = Type::from_number_kind(&val);
-        self.new_value_id(ty.id())
+        let ty = self.types.from_number_kind(&val);
+        self.new_value_id(ty)
     }
 
     pub fn emit_bool(&mut self, val: bool) -> ValueId {
-        self.new_value_id(Type::Bool(Some(val)).id())
+        let ty = self.types.bool(Some(val));
+        self.new_value_id(ty)
     }
 
     pub fn emit_string(&mut self, val: StringId) -> ValueId {
-        self.new_value_id(Type::Struct(StructKind::StringHeader(Some(val))).id())
+        let ty = self
+            .types
+            .intern(&Type::Struct(StructKind::StringHeader(Some(val))));
+        self.new_value_id(ty)
     }
 
     pub fn emit_void(&mut self) -> ValueId {
-        self.new_value_id(Type::Void.id())
+        let ty = self.types.void();
+        self.new_value_id(ty)
     }
 
     pub fn emit_null(&mut self) -> ValueId {
-        self.new_value_id(Type::Null.id())
+        let ty = self.types.null();
+        self.new_value_id(ty)
     }
 
     pub fn emit_const_fn(&mut self, decl_id: DeclarationId) -> ValueId {
@@ -44,8 +50,8 @@ impl<'a> Builder<'a, InBlock> {
             panic!("INTERNAL COMPILER ERROR: Declaration is not a function");
         }
 
-        let ty = Type::Fn(FnType::Direct(decl_id));
-        let dest = self.new_value_id(ty.id());
+        let ty = self.types.intern(&Type::Fn(FnType::Direct(decl_id)));
+        let dest = self.new_value_id(ty);
         dest
     }
 }
