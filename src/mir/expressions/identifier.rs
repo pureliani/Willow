@@ -34,7 +34,7 @@ impl<'a> Builder<'a, InBlock> {
                     .aliases
                     .get(&decl_id)
                     .cloned()
-                    .unwrap_or(Place::Local(decl_id));
+                    .unwrap_or(Place::Var(decl_id));
 
                 self.read_place(&place, identifier.span)
             }

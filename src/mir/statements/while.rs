@@ -2,7 +2,7 @@ use crate::{
     ast::expr::{BlockContents, Expr},
     mir::{
         builders::{Builder, InBlock},
-        types::checked_type::{SpannedType, Type},
+        types::checked_type::SpannedType,
         utils::scope::ScopeKind,
     },
 };
@@ -20,7 +20,7 @@ impl<'a> Builder<'a, InBlock> {
         let cond_id = self.build_expr(
             condition,
             Some(&SpannedType {
-                kind: Type::Bool(None),
+                id: self.types.bool(None),
                 span: condition_span,
             }),
         );

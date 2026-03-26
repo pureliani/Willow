@@ -1,16 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ast::{DeclarationId, IdentifierNode, ModulePath, Span},
+    ast::{DeclarationId, IdentifierNode, ModulePath},
     compile::interner::{TypeId, TypeInterner},
     mir::{
         errors::SemanticError,
         instructions::{Instruction, Terminator},
         types::{
             checked_declaration::{CheckedDeclaration, FunctionEffects},
-            checked_type::{SpannedType, Type},
+            checked_type::SpannedType,
         },
-        utils::{place::Place, points_to::PointsToGraph, scope::Scope},
+        utils::{facts::FactSet, place::Place, points_to::PointsToGraph, scope::Scope},
     },
 };
 
@@ -25,13 +25,6 @@ pub struct BasicBlockId(pub usize);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ValueId(pub usize);
-
-#[derive(Debug, Clone)]
-pub struct TypePredicate {
-    pub decl_id: DeclarationId,
-    pub on_true_type: Option<Type>,
-    pub on_false_type: Option<Type>,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct LoopJumpTargets {
@@ -129,6 +122,13 @@ pub struct BasicBlock {
     pub sealed: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct ConditionFact {
+    pub place: Place,
+    pub on_true: FactSet,
+    pub on_false: FactSet,
+}
+
 pub trait BuilderContext {}
 pub struct Builder<'a, C: BuilderContext> {
     pub context: C,
@@ -138,12 +138,11 @@ pub struct Builder<'a, C: BuilderContext> {
     pub errors: &'a mut Vec<SemanticError>,
     pub current_scope: Scope,
 
-    pub type_predicates: &'a mut HashMap<ValueId, Vec<TypePredicate>>,
+    pub current_facts: &'a mut HashMap<BasicBlockId, HashMap<Place, FactSet>>,
+    pub incomplete_fact_merges: &'a mut HashMap<BasicBlockId, Vec<Place>>,
+    pub condition_facts: &'a mut HashMap<ValueId, Vec<ConditionFact>>,
 
-    pub current_defs: &'a mut HashMap<BasicBlockId, HashMap<Place, ValueId>>,
     pub aliases: &'a mut HashMap<DeclarationId, Place>,
-    pub incomplete_phis: &'a mut HashMap<BasicBlockId, Vec<(ValueId, Place, Span)>>,
-
     pub ptg: &'a mut PointsToGraph,
 }
 

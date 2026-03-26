@@ -1,6 +1,7 @@
 pub mod adjustment;
 pub mod check_type;
 pub mod dump;
+pub mod facts;
 pub mod get_poison;
 pub mod layout;
 pub mod place;

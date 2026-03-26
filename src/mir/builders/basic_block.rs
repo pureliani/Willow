@@ -1,17 +1,13 @@
-use std::collections::HashSet;
-
 use crate::{
-    ast::Span,
     compile::interner::TypeId,
     globals::next_value_id,
     mir::{
         builders::{
             BasicBlock, BasicBlockId, Builder, ExpectBody, Function, InBlock, InFunction,
-            InGlobal, InModule, PhiSource, Place, ValueId,
+            InGlobal, InModule, ValueId,
         },
         instructions::Terminator,
-        types::{checked_declaration::CheckedDeclaration, checked_type::Type},
-        utils::type_to_string::type_to_string,
+        types::checked_declaration::CheckedDeclaration,
     },
 };
 
@@ -22,11 +18,11 @@ impl<'a> Builder<'a, InBlock> {
             program: self.program,
             errors: self.errors,
             current_scope: self.current_scope.clone(),
-            current_defs: self.current_defs,
+            current_facts: self.current_facts,
+            condition_facts: self.condition_facts,
+            incomplete_fact_merges: self.incomplete_fact_merges,
             aliases: self.aliases,
             ptg: self.ptg,
-            incomplete_phis: self.incomplete_phis,
-            type_predicates: self.type_predicates,
             types: self.types,
         }
     }
@@ -39,11 +35,11 @@ impl<'a> Builder<'a, InBlock> {
             program: self.program,
             errors: self.errors,
             current_scope: self.current_scope.clone(),
-            current_defs: self.current_defs,
+            current_facts: self.current_facts,
+            condition_facts: self.condition_facts,
+            incomplete_fact_merges: self.incomplete_fact_merges,
             aliases: self.aliases,
             ptg: self.ptg,
-            incomplete_phis: self.incomplete_phis,
-            type_predicates: self.type_predicates,
             types: self.types,
         }
     }
@@ -57,11 +53,11 @@ impl<'a> Builder<'a, InBlock> {
             program: self.program,
             errors: self.errors,
             current_scope: self.current_scope.clone(),
-            current_defs: self.current_defs,
+            current_facts: self.current_facts,
+            condition_facts: self.condition_facts,
+            incomplete_fact_merges: self.incomplete_fact_merges,
             aliases: self.aliases,
             ptg: self.ptg,
-            incomplete_phis: self.incomplete_phis,
-            type_predicates: self.type_predicates,
             types: self.types,
         }
     }
@@ -127,40 +123,6 @@ impl<'a> Builder<'a, InBlock> {
         })
     }
 
-    pub fn insert_phi(
-        &mut self,
-        basic_block_id: BasicBlockId,
-        phi_id: ValueId,
-        sources: HashSet<PhiSource>,
-    ) {
-        assert!(
-            !sources.is_empty(),
-            "Phi node must have at least one source"
-        );
-
-        let first_source = sources.iter().next().unwrap();
-        let expected_type = self.get_value_type(first_source.value);
-
-        for source in &sources {
-            let current_type = self.get_value_type(source.value);
-
-            if expected_type != current_type {
-                panic!(
-                    "INTERNAL COMPILER ERROR: Phi node type mismatch.\nPhi ID: \
-                     {:?}\nBlock ID: {:?}\nExpected Type: {}\nFound Type: {} (from \
-                     block {:?})",
-                    phi_id,
-                    basic_block_id,
-                    type_to_string(expected_type),
-                    type_to_string(current_type),
-                    source.from
-                );
-            }
-        }
-
-        self.get_bb_mut(basic_block_id).phis.insert(phi_id, sources);
-    }
-
     fn successor_count(&self, block_id: BasicBlockId) -> usize {
         let bb = self.get_bb(block_id);
         match &bb.terminator {
@@ -209,13 +171,6 @@ impl<'a> Builder<'a, InBlock> {
 
     /// Splits a critical edge from `pred_block` to `target_block` by inserting
     /// a new block in between.
-    ///
-    /// A critical edge is one where the predecessor has multiple successors
-    /// and the target has multiple predecessors. Splitting is necessary so that
-    /// coercion instructions for one edge don't affect other edges.
-    ///
-    /// Before: pred_block -> target_block
-    /// After:  pred_block -> split_block -> target_block
     fn split_critical_edge(
         &mut self,
         pred_block: BasicBlockId,
@@ -236,8 +191,8 @@ impl<'a> Builder<'a, InBlock> {
             .remove(&pred_block);
         self.get_bb_mut(target_block).predecessors.insert(split_id);
 
-        if let Some(defs) = self.current_defs.get(&pred_block).cloned() {
-            self.current_defs.insert(split_id, defs);
+        if let Some(facts) = self.current_facts.get(&pred_block).cloned() {
+            self.current_facts.insert(split_id, facts);
         }
 
         split_id
@@ -266,7 +221,7 @@ impl<'a> Builder<'a, InBlock> {
     /// narrowing as needed. Must be called with `self.context.block_id`
     /// set to the block where the coercion instructions should be emitted.
     pub fn coerce_to_union(&mut self, val: ValueId, target_union: TypeId) -> ValueId {
-        let val_type = self.get_value_type(val).clone();
+        let val_type = self.get_value_type(val);
 
         if val_type == target_union {
             return val;
@@ -274,11 +229,10 @@ impl<'a> Builder<'a, InBlock> {
 
         let target_variants = self
             .types
-            .resolve(target_union)
-            .get_union_variants()
+            .get_union_variants(target_union)
             .expect("INTERNAL COMPILER ERROR: coerce_to_union target is not a union");
 
-        if let Some(source_variants) = val_type.get_union_variants() {
+        if let Some(source_variants) = self.types.get_union_variants(val_type) {
             let source_is_subset = source_variants
                 .iter()
                 .all(|sv| target_variants.iter().any(|tv| sv == tv));
@@ -291,62 +245,6 @@ impl<'a> Builder<'a, InBlock> {
         } else {
             self.wrap_in_union(val, target_variants)
         }
-    }
-
-    pub fn resolve_phi(
-        &mut self,
-        block_id: BasicBlockId,
-        phi_id: ValueId,
-        place: &Place,
-        span: Span,
-    ) {
-        let predecessors: Vec<BasicBlockId> =
-            self.get_bb(block_id).predecessors.iter().cloned().collect();
-
-        let mut phi_sources = Vec::new();
-        let mut incoming_types = Vec::new();
-
-        for pred in &predecessors {
-            let val = self.read_place_from_block(*pred, place, span.clone());
-            phi_sources.push((*pred, val));
-            incoming_types.push(self.get_value_type(val).clone());
-        }
-
-        let unified_type = Type::make_union(incoming_types);
-
-        let final_sources = if unified_type.get_union_variants().is_some() {
-            let current_block = self.context.block_id;
-            let mut wrapped = HashSet::new();
-
-            for (pred_block, val) in phi_sources {
-                let coercion_block = self.get_coercion_block(pred_block, block_id);
-
-                self.use_basic_block(coercion_block);
-                let final_val = self.coerce_to_union(val, &unified_type);
-
-                wrapped.insert(PhiSource {
-                    from: coercion_block,
-                    value: final_val,
-                });
-            }
-
-            self.use_basic_block(current_block);
-            wrapped
-        } else {
-            phi_sources
-                .into_iter()
-                .map(|(pred, val)| PhiSource {
-                    from: pred,
-                    value: val,
-                })
-                .collect()
-        };
-
-        if let Some(ty) = self.program.value_types.get_mut(&phi_id) {
-            *ty = unified_type;
-        }
-
-        self.insert_phi(block_id, phi_id, final_sources);
     }
 
     pub fn new_value_id(&mut self, ty: TypeId) -> ValueId {
@@ -373,10 +271,13 @@ impl<'a> Builder<'a, InBlock> {
         }
 
         let block_id = self.context.block_id;
-        let incomplete = self.incomplete_phis.remove(&block_id).unwrap_or_default();
+        let incomplete = self
+            .incomplete_fact_merges
+            .remove(&block_id)
+            .unwrap_or_default();
 
-        for (phi_id, place, span) in incomplete {
-            self.resolve_phi(block_id, phi_id, &place, span);
+        for place in incomplete {
+            self.read_fact_from_block(block_id, &place);
         }
 
         self.bb_mut().sealed = true;

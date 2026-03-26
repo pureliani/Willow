@@ -4,7 +4,6 @@ use crate::{
         builders::{Builder, InModule},
         errors::{SemanticError, SemanticErrorKind},
         types::checked_declaration::{CheckedDeclaration, CheckedTypeAliasDecl},
-        utils::check_type::{check_type_annotation, TypeCheckerContext},
     },
 };
 
@@ -18,13 +17,7 @@ impl<'a> Builder<'a, InModule> {
             return;
         }
 
-        let mut type_ctx = TypeCheckerContext {
-            scope: self.current_scope.clone(),
-            declarations: &self.program.declarations,
-            errors: self.errors,
-        };
-
-        let resolved_type = check_type_annotation(&mut type_ctx, &type_alias_decl.value);
+        let resolved_type = self.check_type_annotation(&type_alias_decl.value);
 
         let checked_type_alias_decl = CheckedTypeAliasDecl {
             id: type_alias_decl.id,

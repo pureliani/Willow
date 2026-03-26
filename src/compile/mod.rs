@@ -159,9 +159,9 @@ impl Compiler {
         }
 
         let mut builder_errors = vec![];
-        let mut current_defs = HashMap::new();
-        let mut incomplete_phis = HashMap::new();
-        let mut type_predicates = HashMap::new();
+        let mut current_facts = HashMap::new();
+        let mut incomplete_fact_merges = HashMap::new();
+        let mut condition_facts = HashMap::new();
         let mut aliases = HashMap::new();
         let mut types = TypeInterner::default();
 
@@ -180,9 +180,9 @@ impl Compiler {
             current_scope: global_scope,
             errors: &mut builder_errors,
             program: &mut program,
-            current_defs: &mut current_defs,
-            incomplete_phis: &mut incomplete_phis,
-            type_predicates: &mut type_predicates,
+            current_facts: &mut current_facts,
+            incomplete_fact_merges: &mut incomplete_fact_merges,
+            condition_facts: &mut condition_facts,
             ptg: &mut global_ptg,
             aliases: &mut aliases,
             types: &mut types,

@@ -104,9 +104,9 @@ impl<'a> Builder<'a, InModule> {
             current_scope: self
                 .current_scope
                 .enter(ScopeKind::FunctionBody, body.span.start),
-            current_defs: self.current_defs,
-            incomplete_phis: self.incomplete_phis,
-            type_predicates: self.type_predicates,
+            condition_facts: self.condition_facts,
+            current_facts: self.current_facts,
+            incomplete_fact_merges: self.incomplete_fact_merges,
             ptg: self.ptg,
             aliases: self.aliases,
             types: self.types,

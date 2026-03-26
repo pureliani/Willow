@@ -12,10 +12,7 @@ use crate::{
             Module,
         },
         types::checked_declaration::CheckedDeclaration,
-        utils::{
-            check_type::{check_params, check_type_annotation, TypeCheckerContext},
-            scope::ScopeKind,
-        },
+        utils::scope::ScopeKind,
     },
 };
 
@@ -81,9 +78,9 @@ impl<'a> Builder<'a, InGlobal> {
             program: self.program,
             errors: self.errors,
             current_scope: scope,
-            current_defs: self.current_defs,
-            incomplete_phis: self.incomplete_phis,
-            type_predicates: self.type_predicates,
+            condition_facts: self.condition_facts,
+            current_facts: self.current_facts,
+            incomplete_fact_merges: self.incomplete_fact_merges,
             ptg: self.ptg,
             aliases: self.aliases,
             types: self.types,
@@ -93,14 +90,8 @@ impl<'a> Builder<'a, InGlobal> {
 
 impl<'a> Builder<'a, InModule> {
     fn register_fn_signature(&mut self, f: &FnDecl) {
-        let mut type_ctx = TypeCheckerContext {
-            scope: self.current_scope.clone(),
-            declarations: &self.program.declarations,
-            errors: self.errors,
-        };
-
-        let checked_params = check_params(&mut type_ctx, &f.params);
-        let checked_return_type = check_type_annotation(&mut type_ctx, &f.return_type);
+        let checked_params = self.check_params(&f.params);
+        let checked_return_type = self.check_type_annotation(&f.return_type);
 
         let function_params = checked_params
             .into_iter()

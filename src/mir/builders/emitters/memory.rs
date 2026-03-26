@@ -118,23 +118,28 @@ impl<'a> Builder<'a, InBlock> {
             _ => panic!("Expected pointer to struct, found {:?}", pointee_ty),
         };
 
-        let (field_index, field_type) =
-            if let Some(v) = struct_kind.get_field(self.types, &field.name) {
-                v
-            } else {
-                return Err(SemanticError {
-                    span: field.span.clone(),
-                    kind: SemanticErrorKind::AccessToUndefinedField(field.clone()),
-                });
-            };
+        let struct_field = if let Some(v) = struct_kind.get_field(self.types, &field.name)
+        {
+            v
+        } else {
+            return Err(SemanticError {
+                span: field.span.clone(),
+                kind: SemanticErrorKind::AccessToUndefinedField(field.clone()),
+            });
+        };
 
-        let field_ptr_ty = self.types.ptr(field_type);
+        let physical_index = struct_field.physical_index.expect(
+            "INTERNAL COMPILER ERROR: try_get_field_ptr called on a ZST field. \
+             ZSTs should be intercepted and synthesized before memory access.",
+        );
+
+        let field_ptr_ty = self.types.ptr(struct_field.ty);
         let dest = self.new_value_id(field_ptr_ty);
 
         self.push_instruction(Instruction::Memory(MemoryInstr::GetFieldPtr {
             dest,
             base_ptr,
-            field_index,
+            field_index: physical_index,
         }));
 
         Ok(dest)
