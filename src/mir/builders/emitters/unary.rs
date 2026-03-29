@@ -41,7 +41,7 @@ impl<'a> Builder<'a, InBlock> {
         let bool_type = self.types.bool(None);
         let dest = self.new_value_id(bool_type);
 
-        if let Some(preds) = self.type_predicates.get(&src).cloned() {
+        if let Some(preds) = self.condition_facts.get(&src).cloned() {
             let flipped: Vec<TypePredicate> = preds
                 .into_iter()
                 .map(|pred| TypePredicate {

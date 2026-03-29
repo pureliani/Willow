@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::{
     ast::{decl::VarDecl, DeclarationId, IdentifierNode, Span},
     compile::interner::TypeId,
@@ -33,7 +35,7 @@ impl<'a> Builder<'a, InBlock> {
             initial_facts.insert(NarrowedTypeFact { variants });
         } else {
             initial_facts.insert(NarrowedTypeFact {
-                variants: std::collections::BTreeSet::from([value_type]),
+                variants: BTreeSet::from([value_type]),
             });
         }
 

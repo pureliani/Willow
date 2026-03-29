@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     ast::{
         expr::{Expr, ExprKind},
-        DeclarationId, IdentifierNode, Span,
+        DeclarationId, IdentifierNode,
     },
     compile::interner::{StringId, TypeId},
     globals::{COMMON_IDENTIFIERS, STRING_INTERNER},
@@ -144,7 +144,7 @@ impl<'a> Builder<'a, InBlock> {
         }
     }
 
-    pub fn get_place_ptr(&mut self, place: &Place, span: Span) -> ValueId {
+    pub fn get_place_ptr(&mut self, place: &Place) -> ValueId {
         match place {
             Place::Var(decl_id) => {
                 let decl = self.program.declarations.get(decl_id).unwrap();
@@ -155,9 +155,9 @@ impl<'a> Builder<'a, InBlock> {
                     }
                 }
             }
-            Place::Deref(base) => self.read_place(base, span),
+            Place::Deref(base) => self.read_place(base),
             Place::Field(base, field) => {
-                let base_ptr = self.get_place_ptr(base, span.clone());
+                let base_ptr = self.get_place_ptr(base);
                 self.get_field_ptr(base_ptr, *field)
             }
             Place::Temporary(val_id) => {
@@ -197,7 +197,7 @@ impl<'a> Builder<'a, InBlock> {
         }
     }
 
-    pub fn read_place(&mut self, place: &Place, span: Span) -> ValueId {
+    pub fn read_place(&mut self, place: &Place) -> ValueId {
         if let Place::Temporary(val_id) = place {
             return *val_id;
         }
@@ -222,7 +222,7 @@ impl<'a> Builder<'a, InBlock> {
             }
         }
 
-        let ptr = self.get_place_ptr(place, span.clone());
+        let ptr = self.get_place_ptr(place);
         let val = self.emit_load(ptr);
 
         let facts = self.read_fact_from_block(self.context.block_id, place);
@@ -249,7 +249,7 @@ impl<'a> Builder<'a, InBlock> {
         val
     }
 
-    pub fn write_place(&mut self, place: &Place, value: ValueId, span: Span) {
+    pub fn write_place(&mut self, place: &Place, value: ValueId) {
         if let Place::Temporary(_) = place {
             panic!("INTERNAL COMPILER ERROR: Cannot write to a temporary r-value");
         }
@@ -260,7 +260,7 @@ impl<'a> Builder<'a, InBlock> {
             return;
         }
 
-        let ptr = self.get_place_ptr(place, span);
+        let ptr = self.get_place_ptr(place);
         self.emit_store(ptr, value);
 
         self.write_fact(self.context.block_id, place, FactSet::new());
