@@ -15,10 +15,7 @@ impl PlaceFact for NarrowedTypeFact {
         self
     }
     fn eq_fact(&self, other: &dyn PlaceFact) -> bool {
-        other
-            .as_any()
-            .downcast_ref::<Self>()
-            .map_or(false, |o| self == o)
+        other.as_any().downcast_ref::<Self>() == Some(self)
     }
 
     fn merge(&self, other: &dyn PlaceFact) -> Option<Box<dyn PlaceFact>> {

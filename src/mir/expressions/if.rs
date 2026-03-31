@@ -66,9 +66,13 @@ impl<'a> Builder<'a, InBlock> {
             self.use_basic_block(then_block_id);
 
             if let Some(facts) = self.condition_facts.get(&cond_id).cloned() {
-                for fact in &facts {
-                    if !fact.on_true.facts.is_empty() {
-                        self.write_fact(then_block_id, &fact.place, fact.on_true.clone());
+                for conditional_facts in &facts {
+                    if !conditional_facts.on_true.facts.is_empty() {
+                        self.write_fact(
+                            then_block_id,
+                            &conditional_facts.place,
+                            conditional_facts.on_true.clone(),
+                        );
                     }
                 }
             }
@@ -83,12 +87,12 @@ impl<'a> Builder<'a, InBlock> {
             self.use_basic_block(next_cond_block_id);
 
             if let Some(facts) = self.condition_facts.get(&cond_id).cloned() {
-                for fact in &facts {
-                    if !fact.on_false.facts.is_empty() {
+                for conditional_facts in &facts {
+                    if !conditional_facts.on_false.facts.is_empty() {
                         self.write_fact(
                             next_cond_block_id,
-                            &fact.place,
-                            fact.on_false.clone(),
+                            &conditional_facts.place,
+                            conditional_facts.on_false.clone(),
                         );
                     }
                 }
@@ -125,7 +129,7 @@ impl<'a> Builder<'a, InBlock> {
 
             let type_entries: Vec<TypeId> = branch_results
                 .iter()
-                .map(|(_, val, _)| self.get_value_type(*val).clone())
+                .map(|(_, val, _)| self.get_value_type(*val))
                 .collect();
 
             let result_type = self.types.make_union(type_entries);

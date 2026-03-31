@@ -51,7 +51,7 @@ impl<'a> Builder<'a, InBlock> {
         }
 
         let ty = self.types.intern(&Type::Fn(FnType::Direct(decl_id)));
-        let dest = self.new_value_id(ty);
-        dest
+
+        self.new_value_id(ty)
     }
 }

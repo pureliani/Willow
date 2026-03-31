@@ -144,7 +144,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Expected an expression, found token `{}`",
-                                    token_kind_to_string(&token.kind)
+                                    token.kind
                                 ))]),
 
                         ParsingErrorKind::ExpectedATypeButFound(token) => diag
@@ -152,7 +152,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Expected a type, found token `{}`",
-                                    token_kind_to_string(&token.kind)
+                                    token.kind
                                 ))]),
 
                         ParsingErrorKind::InvalidSuffixOperator(token) => diag
@@ -160,7 +160,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Token `{}` cannot be used as a suffix",
-                                    token_kind_to_string(&token.kind)
+                                    token.kind
                                 ))]),
 
                         ParsingErrorKind::UnexpectedEndOfInput => diag
@@ -213,17 +213,14 @@ impl Compiler {
                         ParsingErrorKind::ExpectedStatementOrExpression { found } => diag
                             .with_message("Expected statement or expression")
                             .with_labels(vec![Label::primary(file_id, range)
-                                .with_message(format!(
-                                    "Found `{}`",
-                                    token_kind_to_string(&found.kind)
-                                ))]),
+                                .with_message(format!("Found `{}`", found.kind))]),
 
                         ParsingErrorKind::UnexpectedTokenAfterFinalExpression {
                             found,
                         } => diag.with_message("Unexpected token").with_labels(vec![
                             Label::primary(file_id, range).with_message(format!(
                                 "Token `{}` follows final expression",
-                                token_kind_to_string(&found.kind)
+                                found.kind
                             )),
                         ]),
 
@@ -235,10 +232,8 @@ impl Compiler {
                         ParsingErrorKind::ExpectedToBeFollowedByOneOfTheTokens(
                             tokens,
                         ) => {
-                            let expected: Vec<_> = tokens
-                                .iter()
-                                .map(|t| token_kind_to_string(&t.kind))
-                                .collect();
+                            let expected: Vec<_> =
+                                tokens.iter().map(|t| format!("{}", t.kind)).collect();
                             diag.with_message("Unexpected token").with_labels(vec![
                                 Label::primary(file_id, range).with_message(format!(
                                     "Expected one of: {}",
@@ -301,9 +296,9 @@ impl Compiler {
                                 };
 
                             let passed_str =
-                                format_full_path(&passed_arg_span, &passed_path);
+                                format_full_path(passed_arg_span, passed_path);
                             let aliased_str =
-                                format_full_path(&aliased_arg_span, &aliased_path);
+                                format_full_path(aliased_arg_span, aliased_path);
 
                             diag.with_message("Argument aliasing detected").with_labels(
                                 vec![Label::primary(file_id, range).with_message(
@@ -319,7 +314,7 @@ impl Compiler {
                             diag.with_message("Cannot get length")
                         }
                         SemanticErrorKind::CannotNarrowNonUnion(ty) => {
-                            let type_str = type_to_string(*ty);
+                            let type_str = self.types.to_string(*ty);
                             diag.with_message("Redundant type check").with_labels(vec![
                                 Label::primary(file_id, range).with_message(format!(
                                     "Value is already `{}`, `::is()` only works on \
@@ -351,8 +346,8 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Cannot compare `{}` to `{}`",
-                                    type_to_string(*of),
-                                    type_to_string(*to)
+                                    self.types.to_string(*of),
+                                    self.types.to_string(*to)
                                 ))]),
                         SemanticErrorKind::UndeclaredIdentifier(id) => {
                             let name = STRING_INTERNER.resolve(id.name);
@@ -374,8 +369,8 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Expected `{}`, found `{}`",
-                                    type_to_string(*expected),
-                                    type_to_string(*received)
+                                    self.types.to_string(*expected),
+                                    self.types.to_string(*received)
                                 ))]),
                         SemanticErrorKind::ReturnTypeMismatch { expected, received } => {
                             diag.with_message("Function return type mismatch")
@@ -383,8 +378,8 @@ impl Compiler {
                                     .with_message(format!(
                                         "Expected the returned value to have a type \
                                          that is assignable to `{}`, but found `{}`",
-                                        type_to_string(*expected),
-                                        type_to_string(*received)
+                                        self.types.to_string(*expected),
+                                        self.types.to_string(*received)
                                     ))])
                         }
                         SemanticErrorKind::ModuleNotFound(path_buf) => diag
@@ -433,7 +428,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Type `{}` cannot be indexed",
-                                    type_to_string(*ty)
+                                    self.types.to_string(*ty)
                                 ))]),
                         SemanticErrorKind::FromStatementMustBeDeclaredAtTopLevel => diag
                             .with_message("Invalid import location")
@@ -495,7 +490,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Cannot use the function-call operator on type `{}`",
-                                    type_to_string(*target)
+                                    self.types.to_string(*target)
                                 ))]),
                         SemanticErrorKind::ReturnKeywordOutsideFunction => diag
                             .with_message(
@@ -531,7 +526,7 @@ impl Compiler {
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message(format!(
                                     "Cannot use the access operator on the type `{}`",
-                                    type_to_string(*target)
+                                    self.types.to_string(*target)
                                 ))]),
                         SemanticErrorKind::CannotStaticAccess(_) => diag
                             .with_message("Cannot access static field")
@@ -607,8 +602,8 @@ impl Compiler {
                         } => diag.with_message("Invalid type cast").with_labels(vec![
                             Label::primary(file_id, range).with_message(format!(
                                 "Cannot cast type `{}` to `{}`",
-                                type_to_string(*source_type),
-                                type_to_string(*target_type)
+                                self.types.to_string(*source_type),
+                                self.types.to_string(*target_type)
                             )),
                         ]),
                         SemanticErrorKind::ClosuresNotSupportedYet => diag

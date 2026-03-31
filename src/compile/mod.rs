@@ -9,7 +9,7 @@ use std::{
 };
 
 // TODO: re-implement CodeGenerator
-use crate::codegen::CodeGenerator;
+// use crate::codegen::CodeGenerator;
 
 pub mod file_cache;
 pub mod interner;
@@ -94,6 +94,7 @@ pub enum CompilerErrorKind {
 
 pub struct Compiler {
     files: Arc<Mutex<FileCache>>,
+    pub types: TypeInterner,
     errors: Vec<CompilerErrorKind>,
 }
 
@@ -101,6 +102,7 @@ impl Default for Compiler {
     fn default() -> Self {
         Self {
             files: Arc::new(Mutex::new(FileCache::default())),
+            types: TypeInterner::default(),
             errors: Vec::new(),
         }
     }
@@ -163,7 +165,6 @@ impl Compiler {
         let mut incomplete_fact_merges = HashMap::new();
         let mut condition_facts = HashMap::new();
         let mut aliases = HashMap::new();
-        let mut types = TypeInterner::default();
 
         let mut program = Program {
             entry_path: Some(canonical_main.clone()),
@@ -185,7 +186,7 @@ impl Compiler {
             condition_facts: &mut condition_facts,
             ptg: &mut global_ptg,
             aliases: &mut aliases,
-            types: &mut types,
+            types: &self.types,
         };
 
         program_builder.build(modules_to_compile);
@@ -201,7 +202,7 @@ impl Compiler {
         }
 
         if options.emit_hir {
-            dump_program(&program);
+            dump_program(&program, &self.types);
         }
 
         self.errors
@@ -212,62 +213,62 @@ impl Compiler {
             return;
         }
 
-        let triple = options.target_triple();
+        // let triple = options.target_triple();
 
-        let target = Target::from_triple(&triple).unwrap_or_else(|e| {
-            eprintln!("Unsupported target '{}': {}", triple, e.to_string());
-            std::process::exit(1);
-        });
+        // let target = Target::from_triple(&triple).unwrap_or_else(|e| {
+        //     eprintln!("Unsupported target '{}': {}", triple, e.to_string());
+        //     std::process::exit(1);
+        // });
 
-        let target_machine = target
-            .create_target_machine(
-                &triple,
-                "generic",
-                "",
-                options.optimization_level(),
-                RelocMode::PIC,
-                CodeModel::Default,
-            )
-            .unwrap_or_else(|| {
-                eprintln!("Failed to create target machine for '{}'", triple);
-                std::process::exit(1);
-            });
+        // let target_machine = target
+        //     .create_target_machine(
+        //         &triple,
+        //         "generic",
+        //         "",
+        //         options.optimization_level(),
+        //         RelocMode::PIC,
+        //         CodeModel::Default,
+        //     )
+        //     .unwrap_or_else(|| {
+        //         eprintln!("Failed to create target machine for '{}'", triple);
+        //         std::process::exit(1);
+        //     });
 
-        let context = Context::create();
-        let mut codegen = CodeGenerator::new(&context, &program, target_machine);
+        // let context = Context::create();
+        // let mut codegen = CodeGenerator::new(&context, &program, target_machine);
 
-        if options.emit_llvm_ir {
-            codegen.generate_ir();
-            return;
-        }
+        // if options.emit_llvm_ir {
+        //     codegen.generate_ir();
+        //     return;
+        // }
 
-        let obj_path = options.object_path();
-        codegen.generate(&obj_path);
+        // let obj_path = options.object_path();
+        // codegen.generate(&obj_path);
 
-        if options.emit_obj {
-            return;
-        }
+        // if options.emit_obj {
+        //     return;
+        // }
 
-        let linker_status = std::process::Command::new("cc")
-            .arg(&obj_path)
-            .arg("-o")
-            .arg(&options.output)
-            .status();
+        // let linker_status = std::process::Command::new("cc")
+        //     .arg(&obj_path)
+        //     .arg("-o")
+        //     .arg(&options.output)
+        //     .status();
 
-        let _ = std::fs::remove_file(&obj_path);
+        // let _ = std::fs::remove_file(&obj_path);
 
-        match linker_status {
-            Ok(status) if status.success() => {}
-            Ok(status) => {
-                eprintln!("Linker failed with exit code: {}", status);
-                std::process::exit(1);
-            }
-            Err(e) => {
-                eprintln!("Failed to invoke linker: {}", e);
-                eprintln!("Make sure 'cc' is available in your PATH");
-                std::process::exit(1);
-            }
-        }
+        // match linker_status {
+        //     Ok(status) if status.success() => {}
+        //     Ok(status) => {
+        //         eprintln!("Linker failed with exit code: {}", status);
+        //         std::process::exit(1);
+        //     }
+        //     Err(e) => {
+        //         eprintln!("Failed to invoke linker: {}", e);
+        //         eprintln!("Make sure 'cc' is available in your PATH");
+        //         std::process::exit(1);
+        //     }
+        // }
     }
 
     pub fn parallel_parse_modules(

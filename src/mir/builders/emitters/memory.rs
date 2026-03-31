@@ -71,7 +71,7 @@ impl<'a> Builder<'a, InBlock> {
 
     /// offset = ptr<T> + index * sizeof(T)
     pub fn ptr_offset(&mut self, base_ptr: ValueId, index: ValueId) -> ValueId {
-        let ptr_ty = self.get_value_type(base_ptr).clone();
+        let ptr_ty = self.get_value_type(base_ptr);
         let index_ty = self.get_value_type(index);
 
         if !matches!(self.types.resolve(index_ty), Type::USize(_)) {

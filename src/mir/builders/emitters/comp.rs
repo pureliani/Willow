@@ -144,7 +144,7 @@ impl<'a> Builder<'a, InBlock> {
             );
         }
 
-        let dest = self.new_value_id(true_value_type.clone());
+        let dest = self.new_value_id(true_value_type);
         self.push_instruction(Instruction::Select(SelectInstr {
             dest,
             cond: condition,

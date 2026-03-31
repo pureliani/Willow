@@ -16,7 +16,7 @@ impl<'a> Builder<'a, InBlock> {
     ) -> ValueId {
         let source_span = left.span.clone();
         let source = self.build_expr(left, None);
-        let source_type = self.get_value_type(source).clone();
+        let source_type = self.get_value_type(source);
 
         let target_type = self.check_type_annotation(&target);
 
@@ -25,11 +25,16 @@ impl<'a> Builder<'a, InBlock> {
                 Err(_) => self.report_error_and_get_poison(SemanticError {
                     kind: SemanticErrorKind::CannotCastType {
                         source_type,
-                        target_type: target_type.id.clone(),
+                        target_type: target_type.id,
                     },
                     span: source_span.clone(),
                 }),
-                Ok(adj) => self.apply_adjustment(source, adj, target_type.id),
+                Ok(adj) => self.apply_adjustment(
+                    source,
+                    adj,
+                    target_type.id,
+                    source_span.clone(),
+                ),
             };
 
         self.check_expected(adjusted_val, source_span, expected_type)

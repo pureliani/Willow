@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use unicode_segmentation::UnicodeSegmentation;
 
 pub mod tokenize_documentation;
@@ -245,6 +247,22 @@ pub enum TokenKind {
     Doc(String),
 }
 
+impl Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenKind::Identifier(string_id) => {
+                write!(f, "{}", STRING_INTERNER.resolve(*string_id))
+            }
+            TokenKind::Punctuation(punctuation_kind) => {
+                write!(f, "{}", punctuation_kind.to_string())
+            }
+            TokenKind::Keyword(keyword_kind) => write!(f, "{}", keyword_kind.to_string()),
+            TokenKind::String(value) => write!(f, "\"{}\"", value),
+            TokenKind::Number(number_kind) => write!(f, "{}", number_kind.to_string()),
+            TokenKind::Doc(documentation) => write!(f, "---\n{}\n---", documentation),
+        }
+    }
+}
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub span: Span,

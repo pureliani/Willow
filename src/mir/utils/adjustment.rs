@@ -244,9 +244,9 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
         let right_rank = self.types.get_numeric_type_rank(right_type);
 
         if left_rank > right_rank {
-            Ok(left_type.clone())
+            Ok(left_type)
         } else {
-            Ok(right_type.clone())
+            Ok(right_type)
         }
     }
 }
@@ -264,7 +264,7 @@ impl<'a> Builder<'a, InBlock> {
             .map_err(|err| match err {
                 AdjustmentError::Incompatible => SemanticErrorKind::CannotCastType {
                     source_type,
-                    target_type: target.clone(),
+                    target_type: target,
                 },
                 AdjustmentError::TryExplicitCast => SemanticErrorKind::TryExplicitCast,
             })

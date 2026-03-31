@@ -1,18 +1,20 @@
+use std::collections::BTreeSet;
+
 use crate::{
     ast::{
         expr::{Expr, ExprKind},
         type_annotation::TypeAnnotation,
-        DeclarationId, Span,
+        Span,
     },
-    compile::interner::{StringId, TypeId},
+    compile::interner::TypeId,
     mir::{
-        builders::{Builder, InBlock, TypePredicate, ValueId},
+        builders::{Builder, ConditionFact, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
-        types::{
-            checked_declaration::CheckedParam,
-            checked_type::{SpannedType, Type},
+        types::checked_type::SpannedType,
+        utils::{
+            facts::{narrowed_type::NarrowedTypeFact, FactSet},
+            place::Place,
         },
-        utils::check_type::{check_type_annotation, TypeCheckerContext},
     },
 };
 
@@ -20,84 +22,50 @@ impl<'a> Builder<'a, InBlock> {
     fn emit_is_one_of_the_variants(
         &mut self,
         union: ValueId,
-        matching_variants: &[Type],
+        matching_variants: &[TypeId],
         total_variants: usize,
         span: Span,
     ) -> ValueId {
         if matching_variants.is_empty() {
-            return self.emit_bool_literal(false);
+            return self.emit_bool(false);
         }
 
         if matching_variants.len() == total_variants {
-            return self.emit_bool_literal(true);
+            return self.emit_bool(true);
         }
 
         let mut iter = matching_variants.iter();
         let first_variant = iter.next().unwrap();
 
-        let mut result_id = self.emit_test_variant(union, first_variant);
+        let mut result_id = self.emit_test_variant(union, *first_variant);
 
         for variant in iter {
-            let variant_clone = variant.clone();
+            let variant_clone = *variant;
             result_id = self.emit_logical_or(result_id, span.clone(), |builder| {
-                builder.emit_test_variant(union, &variant_clone)
+                builder.emit_test_variant(union, variant_clone)
             });
         }
 
         result_id
     }
 
-    pub fn replace_field_type(
-        struct_ty: &Type,
-        field: StringId,
-        new_field_ty: TypeId,
-    ) -> Type {
-        if let Type::Struct(fields) = struct_ty {
-            let new_fields = fields
-                .iter()
-                .map(|f| {
-                    if f.identifier.name == field {
-                        CheckedParam {
-                            identifier: f.identifier.clone(),
-                            ty: SpannedType {
-                                id: new_field_ty,
-                                span: Span::default(), // TODO: fix this later
-                            },
-                        }
-                    } else {
-                        f.clone()
-                    }
-                })
-                .collect();
-            Type::Struct(new_fields)
-        } else {
-            struct_ty.clone()
-        }
-    }
-
-    /// Walk a narrowable expression up to the root variable, lifting the
-    /// narrowed leaf types into the root's struct type at each level.
-    pub fn resolve_narrow_target(
-        &mut self,
-        expr: &Expr,
-        on_true: Option<Type>,
-        on_false: Option<Type>,
-    ) -> Option<(DeclarationId, Option<Type>, Option<Type>)> {
+    pub fn resolve_narrow_target(&self, expr: &Expr) -> Option<Place> {
         match &expr.kind {
             ExprKind::Identifier(ident) => {
                 let decl_id = self.current_scope.lookup(ident.name)?;
-                Some((decl_id, on_true, on_false))
+                Some(Place::Var(decl_id))
             }
             ExprKind::Access { left, field } => {
-                let parent_val = self.build_expr(*left.clone(), None);
-                let parent_ty = self.get_value_type(parent_val).clone();
+                let base_place = self.resolve_narrow_target(left)?;
+                let base_ty = self.type_of_place(&base_place);
 
-                let lifted_true =
-                    on_true.map(|t| Self::replace_field_type(&parent_ty, field.name, t));
-                let lifted_false =
-                    on_false.map(|t| Self::replace_field_type(&parent_ty, field.name, t));
+                let derefed_place = if self.types.is_pointer(base_ty) {
+                    Place::Deref(Box::new(base_place))
+                } else {
+                    base_place
+                };
 
-                self.resolve_narrow_target(left, lifted_true, lifted_false)
+                Some(Place::Field(Box::new(derefed_place), field.name))
             }
             _ => None,
         }
@@ -111,27 +79,24 @@ impl<'a> Builder<'a, InBlock> {
     ) -> ValueId {
         let span = left.span.clone();
 
-        let current_val = self.build_expr(left.clone(), None);
-        let current_ty = self.get_value_type(current_val).clone();
+        let place_opt = self.resolve_narrow_target(&left);
 
-        let source_variants = match current_ty.get_narrowed_variants() {
+        let current_val = self.build_expr(left, None);
+        let current_ty = self.get_value_type(current_val);
+
+        let source_variants = match self.types.get_union_variants(current_ty) {
             Some(v) => v,
             None => {
                 return self.report_error_and_get_poison(SemanticError {
                     span: span.clone(),
-                    kind: SemanticErrorKind::CannotNarrowNonUnion(current_ty.clone()),
+                    kind: SemanticErrorKind::CannotNarrowNonUnion(current_ty),
                 });
             }
         };
 
-        let mut type_ctx = TypeCheckerContext {
-            scope: self.current_scope.clone(),
-            declarations: &self.program.declarations,
-            errors: self.errors,
-        };
-        let target_type = check_type_annotation(&mut type_ctx, &ty);
+        let target_type = self.check_type_annotation(&ty);
 
-        if target_type.kind.get_narrowed_variants().is_some() {
+        if self.types.get_union_variants(target_type.id).is_some() {
             return self.report_error_and_get_poison(SemanticError {
                 kind: SemanticErrorKind::UnsupportedUnionNarrowing,
                 span: ty.span.clone(),
@@ -141,11 +106,11 @@ impl<'a> Builder<'a, InBlock> {
         let mut matching_variants = Vec::new();
         let mut non_matching_variants = Vec::new();
 
-        for variant in source_variants {
-            if variant == &target_type.kind {
-                matching_variants.push(variant.clone());
+        for variant in source_variants.iter() {
+            if *variant == target_type.id {
+                matching_variants.push(*variant);
             } else {
-                non_matching_variants.push(variant.clone());
+                non_matching_variants.push(*variant);
             }
         }
 
@@ -156,15 +121,10 @@ impl<'a> Builder<'a, InBlock> {
             span.clone(),
         );
 
-        let base_variants = current_ty.get_base_variants().unwrap();
-
         let true_type = if !matching_variants.is_empty()
             && matching_variants.len() < source_variants.len()
         {
-            Some(Type::Union {
-                base: base_variants.clone(),
-                narrowed: matching_variants.into_iter().collect(),
-            })
+            Some(self.types.make_union(matching_variants.clone()))
         } else {
             None
         };
@@ -172,24 +132,37 @@ impl<'a> Builder<'a, InBlock> {
         let false_type = if !non_matching_variants.is_empty()
             && non_matching_variants.len() < source_variants.len()
         {
-            Some(Type::Union {
-                base: base_variants.clone(),
-                narrowed: non_matching_variants.into_iter().collect(),
-            })
+            Some(self.types.make_union(non_matching_variants.clone()))
         } else {
             None
         };
 
         if true_type.is_some() || false_type.is_some() {
-            if let Some((decl_id, lifted_true, lifted_false)) =
-                self.resolve_narrow_target(&left, true_type, false_type)
-            {
-                self.type_predicates.insert(
+            if let Some(place) = place_opt {
+                let mut on_true = FactSet::new();
+                if let Some(tt) = true_type {
+                    let variants = self
+                        .types
+                        .get_union_variants(tt)
+                        .unwrap_or_else(|| BTreeSet::from([tt]));
+                    on_true.insert(NarrowedTypeFact { variants });
+                }
+
+                let mut on_false = FactSet::new();
+                if let Some(ft) = false_type {
+                    let variants = self
+                        .types
+                        .get_union_variants(ft)
+                        .unwrap_or_else(|| BTreeSet::from([ft]));
+                    on_false.insert(NarrowedTypeFact { variants });
+                }
+
+                self.condition_facts.insert(
                     result_id,
-                    vec![TypePredicate {
-                        decl_id,
-                        on_true_type: lifted_true,
-                        on_false_type: lifted_false,
+                    vec![ConditionFact {
+                        place,
+                        on_true,
+                        on_false,
                     }],
                 );
             }

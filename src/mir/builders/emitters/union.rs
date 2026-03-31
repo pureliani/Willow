@@ -38,7 +38,7 @@ impl<'a> Builder<'a, InBlock> {
         let union_ptr = self.emit_stack_alloc(struct_type, 1);
 
         let id_ptr = self.get_field_ptr(union_ptr, COMMON_IDENTIFIERS.id);
-        let id_val = self.emit_number(NumberKind::U32(source_type.0 as u32));
+        let id_val = self.emit_number(NumberKind::U32(source_type.0));
         self.emit_store(id_ptr, id_val);
 
         let value_ptr = self.get_field_ptr(union_ptr, COMMON_IDENTIFIERS.val);
@@ -124,7 +124,7 @@ impl<'a> Builder<'a, InBlock> {
 
         let id_ptr = self.get_field_ptr(union_ptr, COMMON_IDENTIFIERS.id);
         let id_val = self.emit_load(id_ptr);
-        let expected = self.emit_number(NumberKind::U32(variant_type.0 as u32));
+        let expected = self.emit_number(NumberKind::U32(variant_type.0));
         self.eq(id_val, expected)
     }
 }

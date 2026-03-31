@@ -1,4 +1,5 @@
 use crate::{
+    compile::interner::TypeInterner,
     globals::STRING_INTERNER,
     mir::{
         builders::{
@@ -10,13 +11,12 @@ use crate::{
             SelectInstr, Terminator, UnaryInstr,
         },
         types::{checked_declaration::CheckedDeclaration, checked_type::Type},
-        utils::type_to_string::type_to_string,
     },
 };
 use std::{collections::VecDeque, fmt::Write};
 
-fn get_vt(p: &Program, vid: &ValueId) -> String {
-    type_to_string(&p.value_types[vid])
+fn get_vt(p: &Program, vid: &ValueId, interner: &TypeInterner) -> String {
+    interner.to_string(p.value_types[vid])
 }
 
 fn find_blocks(f: &Function) -> Vec<BasicBlockId> {
@@ -62,30 +62,36 @@ fn find_blocks(f: &Function) -> Vec<BasicBlockId> {
     blocks
 }
 
-pub fn dump_program(program: &Program) {
+pub fn dump_program(program: &Program, interner: &TypeInterner) {
     let mut out = String::new();
     writeln!(out, "========== HIR DUMP START ==========").unwrap();
     for (_, decl) in program.declarations.iter() {
         if let CheckedDeclaration::Function(f) = decl {
-            dump_function(f, program, &mut out);
+            dump_function(f, program, interner, &mut out);
         }
     }
     writeln!(out, "====================================").unwrap();
     println!("{}", out);
 }
 
-fn dump_function(f: &Function, p: &Program, out: &mut String) {
+fn dump_function(f: &Function, p: &Program, interner: &TypeInterner, out: &mut String) {
     let fn_name = STRING_INTERNER.resolve(f.identifier.name);
-    let return_type = type_to_string(&f.return_type.kind);
+    let return_type = interner.to_string(f.return_type.id);
     writeln!(out, "fn {fn_name} -> {return_type}:").unwrap();
     let block_ids = find_blocks(f);
 
     for bid in block_ids {
-        dump_block(&bid, f, p, out);
+        dump_block(&bid, f, p, interner, out);
     }
 }
 
-pub fn dump_block(block_id: &BasicBlockId, f: &Function, p: &Program, out: &mut String) {
+pub fn dump_block(
+    block_id: &BasicBlockId,
+    f: &Function,
+    p: &Program,
+    interner: &TypeInterner,
+    out: &mut String,
+) {
     let bb = f.expect_body().blocks.get(block_id).unwrap();
     writeln!(out, "  block_{}:", bb.id.0).unwrap();
 
@@ -97,7 +103,7 @@ pub fn dump_block(block_id: &BasicBlockId, f: &Function, p: &Program, out: &mut 
 
     writeln!(out).unwrap();
 
-    dump_instructions(&bb.instructions, p, out);
+    dump_instructions(&bb.instructions, p, interner, out);
 
     if let Some(term) = bb.terminator.clone() {
         match term {
@@ -123,7 +129,12 @@ pub fn dump_block(block_id: &BasicBlockId, f: &Function, p: &Program, out: &mut 
     }
 }
 
-pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) {
+pub fn dump_instructions(
+    instrs: &[Instruction],
+    p: &Program,
+    interner: &TypeInterner,
+    out: &mut String,
+) {
     let get_binary_sign = |instr: &BinaryInstr| match instr {
         BinaryInstr::IAdd { .. } | BinaryInstr::FAdd { .. } => "+",
         BinaryInstr::ISub { .. } | BinaryInstr::FSub { .. } => "-",
@@ -163,12 +174,24 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
         match instruction {
             Instruction::Unary(kind) => match kind {
                 UnaryInstr::INeg { dest, src } | UnaryInstr::FNeg { dest, src } => {
-                    writeln!(out, "v{}: {} = -{};", dest.0, get_vt(p, dest), src.0)
-                        .unwrap();
+                    writeln!(
+                        out,
+                        "v{}: {} = -v{};",
+                        dest.0,
+                        get_vt(p, dest, interner),
+                        src.0
+                    )
+                    .unwrap();
                 }
                 UnaryInstr::BNot { dest, src } => {
-                    writeln!(out, "v{}: {} = !{};", dest.0, get_vt(p, dest), src.0)
-                        .unwrap();
+                    writeln!(
+                        out,
+                        "v{}: {} = !v{};",
+                        dest.0,
+                        get_vt(p, dest, interner),
+                        src.0
+                    )
+                    .unwrap();
                 }
             },
             Instruction::Binary(kind) => match kind {
@@ -188,7 +211,7 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                         out,
                         "v{}: {} = v{} {} v{};",
                         dest.0,
-                        get_vt(p, dest),
+                        get_vt(p, dest, interner),
                         lhs.0,
                         get_binary_sign(kind),
                         rhs.0
@@ -217,7 +240,7 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                         out,
                         "v{}: {} = v{} {} v{};",
                         dest.0,
-                        get_vt(p, dest),
+                        get_vt(p, dest, interner),
                         lhs.0,
                         get_comp_sign(kind),
                         rhs.0
@@ -235,7 +258,7 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                     out,
                     "v{}: {} = v{} ? v{} : v{};",
                     dest.0,
-                    get_vt(p, dest),
+                    get_vt(p, dest, interner),
                     cond.0,
                     true_val.0,
                     false_val.0
@@ -253,14 +276,14 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                     out,
                     "v{}: {} = call v{}({});",
                     dest.0,
-                    get_vt(p, dest),
+                    get_vt(p, dest, interner),
                     func.0,
                     args
                 )
                 .unwrap();
             }
             Instruction::Reinterpret(bitcast_instr) => {
-                let dest_type_str = get_vt(p, &bitcast_instr.dest);
+                let dest_type_str = get_vt(p, &bitcast_instr.dest, interner);
                 writeln!(
                     out,
                     "v{}: {} = bitcast v{};",
@@ -270,30 +293,30 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
             }
             Instruction::Memory(kind) => match kind {
                 MemoryInstr::StackAlloc { dest, count } => {
-                    let inner_ty = match &p.value_types[dest] {
-                        Type::Pointer(to) => type_to_string(to),
+                    let inner_ty = match interner.resolve(p.value_types[dest]) {
+                        Type::Pointer(to) => interner.to_string(to),
                         _ => "unknown".to_string(),
                     };
                     writeln!(
                         out,
-                        "v{}: {} = stackAlloc(v{} x {});",
+                        "v{}: {} = stackAlloc({} x {});",
                         dest.0,
-                        get_vt(p, dest),
+                        get_vt(p, dest, interner),
                         count,
                         inner_ty
                     )
                     .unwrap();
                 }
                 MemoryInstr::HeapAlloc { dest, count } => {
-                    let inner_ty = match &p.value_types[dest] {
-                        Type::Pointer(to) => type_to_string(to),
+                    let inner_ty = match interner.resolve(p.value_types[dest]) {
+                        Type::Pointer(to) => interner.to_string(to),
                         _ => "unknown".to_string(),
                     };
                     writeln!(
                         out,
                         "v{}: {} = heapAlloc(v{} x {});",
                         dest.0,
-                        get_vt(p, dest),
+                        get_vt(p, dest, interner),
                         count.0,
                         inner_ty
                     )
@@ -306,8 +329,14 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                     writeln!(out, "*v{} = v{};", ptr.0, value.0).unwrap();
                 }
                 MemoryInstr::Load { dest, ptr } => {
-                    writeln!(out, "v{}: {} = *v{};", dest.0, get_vt(p, dest), ptr.0)
-                        .unwrap();
+                    writeln!(
+                        out,
+                        "v{}: {} = *v{};",
+                        dest.0,
+                        get_vt(p, dest, interner),
+                        ptr.0
+                    )
+                    .unwrap();
                 }
                 MemoryInstr::MemCopy { dest, src } => {
                     writeln!(
@@ -322,12 +351,12 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                     base_ptr,
                     field_index,
                 } => {
-                    let base_ty = &p.value_types[base_ptr];
-                    let field_name = match base_ty {
-                        Type::Pointer(to) => match &**to {
-                            Type::Struct(s) => {
-                                STRING_INTERNER.resolve(s.fields()[*field_index].0)
-                            }
+                    let base_ty = p.value_types[base_ptr];
+                    let field_name = match interner.resolve(base_ty) {
+                        Type::Pointer(to) => match interner.resolve(to) {
+                            Type::Struct(s) => STRING_INTERNER
+                                .resolve(s.fields(interner)[*field_index].0)
+                                .to_string(),
                             _ => format!("{}", field_index),
                         },
                         _ => format!("{}", field_index),
@@ -336,7 +365,7 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                         out,
                         "v{}: {} = &v{}.{};",
                         dest.0,
-                        get_vt(p, dest),
+                        get_vt(p, dest, interner),
                         base_ptr.0,
                         field_name
                     )
@@ -349,9 +378,9 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                 } => {
                     writeln!(
                         out,
-                        "v{}: {} = {} + {};",
+                        "v{}: {} = {} + v{};",
                         dest.0,
-                        get_vt(p, dest),
+                        get_vt(p, dest, interner),
                         base_ptr.0,
                         index.0
                     )
@@ -373,7 +402,7 @@ pub fn dump_instructions(instrs: &[Instruction], p: &Program, out: &mut String) 
                         out,
                         "v{}: {} = {}(v{})",
                         dest.0,
-                        get_vt(p, dest),
+                        get_vt(p, dest, interner),
                         get_cast_name(kind),
                         src.0
                     )

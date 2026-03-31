@@ -17,7 +17,7 @@ impl<'a> Builder<'a, InBlock> {
         let span = field.span.clone();
 
         let left_id = self.build_expr(left, None);
-        let left_type = self.get_value_type(left_id).clone();
+        let left_type = self.get_value_type(left_id);
 
         let result = self.report_error_and_get_poison(SemanticError {
             kind: SemanticErrorKind::CannotStaticAccess(left_type),

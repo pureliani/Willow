@@ -5,14 +5,14 @@ use crate::mir::{
 
 impl<'a> Builder<'a, InBlock> {
     fn emit_ineg(&mut self, src: ValueId) -> ValueId {
-        let ty = self.get_value_type(src).clone();
+        let ty = self.get_value_type(src);
         let dest = self.new_value_id(ty);
         self.push_instruction(Instruction::Unary(UnaryInstr::INeg { dest, src }));
         dest
     }
 
     fn emit_fneg(&mut self, src: ValueId) -> ValueId {
-        let ty = self.get_value_type(src).clone();
+        let ty = self.get_value_type(src);
         let dest = self.new_value_id(ty);
         self.push_instruction(Instruction::Unary(UnaryInstr::FNeg { dest, src }));
         dest
