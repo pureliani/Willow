@@ -171,7 +171,14 @@ impl<'a> Builder<'a, InBlock> {
 
     pub fn is_zst(&self, ty_id: TypeId) -> bool {
         let ty = self.types.resolve(ty_id);
-        get_layout_of(&ty, self.types).size == 0
+        get_layout_of(
+            &ty,
+            self.types,
+            self.program.target_ptr_size,
+            self.program.target_ptr_align,
+        )
+        .size
+            == 0
     }
 
     pub fn materialize_zst(&mut self, ty_id: TypeId) -> ValueId {

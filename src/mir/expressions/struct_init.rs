@@ -69,13 +69,22 @@ impl<'a> Builder<'a, InBlock> {
             });
         }
 
-        let struct_kind =
-            pack_struct(StructKind::UserDefined(anonymous_params), self.types);
+        let struct_kind = pack_struct(
+            StructKind::UserDefined(anonymous_params),
+            self.types,
+            self.program.target_ptr_size,
+            self.program.target_ptr_align,
+        );
 
         let struct_ty_id = self.types.intern(&Type::Struct(struct_kind.clone()));
 
         let base_ptr = if !by_value {
-            let layout = get_layout_of(&Type::Struct(struct_kind.clone()), self.types);
+            let layout = get_layout_of(
+                &Type::Struct(struct_kind.clone()),
+                self.types,
+                self.program.target_ptr_size,
+                self.program.target_ptr_align,
+            );
             let count: usize = if layout.size == 0 { 0 } else { 1 };
             let count_val = self.emit_number(NumberKind::USize(count));
             self.emit_heap_alloc(struct_ty_id, count_val)

@@ -37,6 +37,9 @@ pub struct Program {
     pub value_types: HashMap<ValueId, TypeId>,
     pub declarations: HashMap<DeclarationId, CheckedDeclaration>,
     pub entry_path: Option<ModulePath>,
+
+    pub target_ptr_size: usize,
+    pub target_ptr_align: usize,
 }
 
 pub struct Module {

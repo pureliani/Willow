@@ -126,8 +126,12 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
             }
             TypeAnnotationKind::Struct(items) => {
                 let checked_field_types = self.check_params(items);
-                let packed =
-                    pack_struct(StructKind::UserDefined(checked_field_types), self.types);
+                let packed = pack_struct(
+                    StructKind::UserDefined(checked_field_types),
+                    self.types,
+                    self.program.target_ptr_size,
+                    self.program.target_ptr_align,
+                );
                 let inner = self.types.intern(&Type::Struct(packed));
                 self.types.ptr(inner)
             }
