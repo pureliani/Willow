@@ -2,6 +2,7 @@ use inkwell::context::Context;
 use inkwell::targets::*;
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
+use std::collections::BTreeMap;
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -195,9 +196,9 @@ impl Compiler {
 
         let mut program = Program {
             entry_path: Some(canonical_main.clone()),
-            declarations: HashMap::new(),
-            modules: HashMap::new(),
-            value_types: HashMap::new(),
+            declarations: BTreeMap::new(),
+            modules: BTreeMap::new(),
+            value_types: BTreeMap::new(),
             target_ptr_size,
             target_ptr_align,
         };

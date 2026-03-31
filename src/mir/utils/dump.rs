@@ -3,8 +3,7 @@ use crate::{
     globals::STRING_INTERNER,
     mir::{
         builders::{
-            BasicBlockId, ExpectBody, Function, FunctionBodyKind, FunctionCFG, Program,
-            ValueId,
+            BasicBlockId, ExpectBody, Function, FunctionBodyKind, Program, ValueId,
         },
         instructions::{
             BinaryInstr, CallInstr, CastInstr, CompInstr, Instruction, MemoryInstr,
@@ -13,53 +12,10 @@ use crate::{
         types::{checked_declaration::CheckedDeclaration, checked_type::Type},
     },
 };
-use std::{collections::VecDeque, fmt::Write};
+use std::fmt::Write;
 
 fn get_vt(p: &Program, vid: &ValueId, interner: &TypeInterner) -> String {
     interner.to_string(p.value_types[vid])
-}
-
-fn find_blocks(f: &Function) -> Vec<BasicBlockId> {
-    let mut blocks = Vec::new();
-    let mut queue = VecDeque::new();
-    let mut expanded = std::collections::HashSet::new();
-
-    if let FunctionBodyKind::Internal(FunctionCFG {
-        entry_block: f_entry_block,
-        blocks: f_blocks,
-        ..
-    }) = &f.body
-    {
-        queue.push_back(*f_entry_block);
-
-        while let Some(bid) = queue.pop_front() {
-            blocks.retain(|&id| id != bid);
-            blocks.push(bid);
-
-            if expanded.insert(bid) {
-                if let Some(bb) = f_blocks.get(&bid) {
-                    if let Some(terminator) = &bb.terminator {
-                        match terminator {
-                            Terminator::Jump { target, .. } => {
-                                queue.push_back(*target);
-                            }
-                            Terminator::CondJump {
-                                true_target,
-                                false_target,
-                                ..
-                            } => {
-                                queue.push_back(*true_target);
-                                queue.push_back(*false_target);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    blocks
 }
 
 pub fn dump_program(program: &Program, interner: &TypeInterner) {
@@ -78,7 +34,11 @@ fn dump_function(f: &Function, p: &Program, interner: &TypeInterner, out: &mut S
     let fn_name = STRING_INTERNER.resolve(f.identifier.name);
     let return_type = interner.to_string(f.return_type.id);
     writeln!(out, "fn {fn_name} -> {return_type}:").unwrap();
-    let block_ids = find_blocks(f);
+    let block_ids = if let FunctionBodyKind::Internal(cfg) = &f.body {
+        cfg.blocks.keys().cloned().collect()
+    } else {
+        vec![]
+    };
 
     for bid in block_ids {
         dump_block(&bid, f, p, interner, out);

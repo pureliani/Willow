@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     ast::{DeclarationId, IdentifierNode, ModulePath},
@@ -20,10 +20,10 @@ pub mod function;
 pub mod module;
 pub mod program;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BasicBlockId(pub usize);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ValueId(pub usize);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -33,9 +33,9 @@ pub struct LoopJumpTargets {
 }
 
 pub struct Program {
-    pub modules: HashMap<ModulePath, Module>,
-    pub value_types: HashMap<ValueId, TypeId>,
-    pub declarations: HashMap<DeclarationId, CheckedDeclaration>,
+    pub modules: BTreeMap<ModulePath, Module>,
+    pub value_types: BTreeMap<ValueId, TypeId>,
+    pub declarations: BTreeMap<DeclarationId, CheckedDeclaration>,
     pub entry_path: Option<ModulePath>,
 
     pub target_ptr_size: usize,
@@ -58,9 +58,9 @@ pub struct FunctionParam {
 #[derive(Debug, Clone)]
 pub struct FunctionCFG {
     pub entry_block: BasicBlockId,
-    pub blocks: HashMap<BasicBlockId, BasicBlock>,
+    pub blocks: BTreeMap<BasicBlockId, BasicBlock>,
 
-    pub value_definitions: HashMap<ValueId, BasicBlockId>,
+    pub value_definitions: BTreeMap<ValueId, BasicBlockId>,
     pub ptg: PointsToGraph,
     pub effects: FunctionEffects,
 }

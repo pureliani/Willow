@@ -44,26 +44,21 @@ impl<'ctx, 'a> CodeGenerator<'ctx, 'a> {
                 if let FunctionBodyKind::Internal(cfg) = &f.body {
                     let fn_val = self.functions[decl_id];
 
-                    let entry_name = format!("block_{}", cfg.entry_block.0);
-                    let entry_llvm_block =
-                        self.context.append_basic_block(fn_val, &entry_name);
-                    self.blocks.insert(cfg.entry_block, entry_llvm_block);
-
                     for &block_id in cfg.blocks.keys() {
-                        if block_id != cfg.entry_block {
-                            let block_name = format!("block_{}", block_id.0);
-                            let llvm_block =
-                                self.context.append_basic_block(fn_val, &block_name);
-                            self.blocks.insert(block_id, llvm_block);
-                        }
+                        let block_name = format!("block_{}", block_id.0);
+                        let llvm_block =
+                            self.context.append_basic_block(fn_val, &block_name);
+                        self.blocks.insert(block_id, llvm_block);
                     }
 
                     for (i, param) in f.params.iter().enumerate() {
                         if let Some(val_id) = param.value_id {
                             let llvm_param = fn_val.get_nth_param(i as u32).unwrap();
-                            llvm_param.set_name(
-                                &STRING_INTERNER.resolve(param.identifier.name),
-                            );
+
+                            let param_name =
+                                STRING_INTERNER.resolve(param.identifier.name);
+                            llvm_param.set_name(&param_name);
+
                             self.values.insert(val_id, llvm_param);
                         }
                     }

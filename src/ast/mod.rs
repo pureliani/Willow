@@ -61,7 +61,7 @@ impl Hash for StringNode {
     }
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ModulePath(pub Arc<PathBuf>);
 
 impl From<ModulePath> for PathBuf {

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use crate::{
     ast::{
@@ -84,8 +84,8 @@ impl<'a> Builder<'a, InModule> {
         {
             let cfg = FunctionCFG {
                 entry_block: entry_block_id,
-                blocks: HashMap::new(),
-                value_definitions: HashMap::new(),
+                blocks: BTreeMap::new(),
+                value_definitions: BTreeMap::new(),
                 ptg: PointsToGraph::new(),
                 effects: FunctionEffects::default(),
             };

@@ -9,16 +9,53 @@ use crate::mir::instructions::{
     Terminator, UnaryInstr,
 };
 use crate::mir::types::checked_declaration::FnType;
-use crate::mir::types::checked_type::Type;
+use crate::mir::types::checked_type::{StructKind, Type};
 
 impl<'ctx, 'a> CodeGenerator<'ctx, 'a> {
     fn get_val(&self, id: ValueId) -> BasicValueEnum<'ctx> {
-        *self.values.get(&id).unwrap_or_else(|| {
-            panic!(
-                "INTERNAL COMPILER ERROR: ValueId({}) not found in codegen",
-                id.0
-            )
-        })
+        if let Some(val) = self.values.get(&id) {
+            return *val;
+        }
+
+        let ty_id = self.program.value_types[&id];
+        let ty = self.type_interner.resolve(ty_id);
+
+        match ty {
+            Type::Bool(Some(b)) => self.context.bool_type().const_int(b as u64, false).into(),
+            Type::U8(Some(v)) => self.context.i8_type().const_int(v as u64, false).into(),
+            Type::I8(Some(v)) => self.context.i8_type().const_int(v as u64, true).into(),
+            Type::U16(Some(v)) => self.context.i16_type().const_int(v as u64, false).into(),
+            Type::I16(Some(v)) => self.context.i16_type().const_int(v as u64, true).into(),
+            Type::U32(Some(v)) => self.context.i32_type().const_int(v as u64, false).into(),
+            Type::I32(Some(v)) => self.context.i32_type().const_int(v as u64, true).into(),
+            Type::U64(Some(v)) => self.context.i64_type().const_int(v as u64, false).into(),
+            Type::I64(Some(v)) => self.context.i64_type().const_int(v as u64, true).into(),
+            Type::USize(Some(v)) => {
+                let target_data = self.target_machine.get_target_data();
+                self.context.ptr_sized_int_type(&target_data, None).const_int(v as u64, false).into()
+            }
+            Type::ISize(Some(v)) => {
+                let target_data = self.target_machine.get_target_data();
+                self.context.ptr_sized_int_type(&target_data, None).const_int(v as u64, true).into()
+            }
+            Type::F32(Some(v)) => self.context.f32_type().const_float(v.0 as f64).into(),
+            Type::F64(Some(v)) => self.context.f64_type().const_float(v.0).into(),
+            
+            Type::Null | Type::Void | Type::Never => {
+                self.context.struct_type(&[], false).const_zero().into()
+            }
+            Type::Fn(FnType::Direct(_)) => {
+                self.context.struct_type(&[], false).const_zero().into()
+            }
+            Type::Struct(StructKind::StringHeader(Some(_))) => {
+                self.context.struct_type(&[], false).const_zero().into()
+            }
+
+            _ => panic!(
+                "INTERNAL COMPILER ERROR: ValueId({}) not found in codegen and is not a literal type ({})",
+                id.0, self.type_interner.to_string(ty_id)
+            ),
+        }
     }
 
     fn store_val(&mut self, id: ValueId, val: BasicValueEnum<'ctx>) {
