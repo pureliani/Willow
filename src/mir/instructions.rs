@@ -245,4 +245,7 @@ pub enum Terminator {
     Return {
         value: ValueId,
     },
+    Panic {
+        message: Option<ValueId>,
+    },
 }

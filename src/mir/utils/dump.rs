@@ -125,6 +125,13 @@ pub fn dump_block(
             Terminator::Return { value } => {
                 writeln!(out, "    ret v{}\n", value.0).unwrap();
             }
+            Terminator::Panic { message } => {
+                if let Some(msg) = message {
+                    writeln!(out, "    panic v{}\n", msg.0).unwrap();
+                } else {
+                    writeln!(out, "    panic\n").unwrap();
+                }
+            }
         }
     }
 }

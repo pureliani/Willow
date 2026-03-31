@@ -128,7 +128,7 @@ impl<'a> Builder<'a, InBlock> {
         match &bb.terminator {
             Some(Terminator::CondJump { .. }) => 2,
             Some(Terminator::Jump { .. }) => 1,
-            Some(Terminator::Return { .. }) => 0,
+            Some(Terminator::Return { .. }) | Some(Terminator::Panic { .. }) => 0,
             None => 0,
         }
     }

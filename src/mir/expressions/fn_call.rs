@@ -6,6 +6,7 @@ use crate::{
         DeclarationId, Span,
     },
     compile::interner::TypeId,
+    globals::STRING_INTERNER,
     mir::{
         builders::{Builder, ExpectBody, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -25,6 +26,32 @@ impl<'a> Builder<'a, InBlock> {
         span: Span,
         expected_type: Option<&SpannedType>,
     ) -> ValueId {
+        // Check if panic call
+        if let ExprKind::Identifier(ident) = &left.kind {
+            if STRING_INTERNER.resolve(ident.name) == "panic" {
+                if args.len() > 1 {
+                    return self.report_error_and_get_poison(SemanticError {
+                        kind: SemanticErrorKind::FnArgumentCountMismatch {
+                            expected: 1,
+                            received: args.len(),
+                        },
+                        span: span.clone(),
+                    });
+                }
+
+                let msg_val = args
+                    .into_iter()
+                    .next()
+                    .map(|arg| self.build_expr(arg, None));
+
+                self.emit_panic(msg_val);
+
+                let never_ty = self.types.intern(&Type::Never);
+                let val = self.new_value_id(never_ty);
+                return self.check_expected(val, span, expected_type);
+            }
+        }
+
         let callee_decl_id = match &left.kind {
             ExprKind::Identifier(ident) => self.current_scope.lookup(ident.name),
             _ => None,
