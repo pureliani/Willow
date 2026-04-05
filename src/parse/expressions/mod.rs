@@ -70,7 +70,6 @@ pub fn is_start_of_expr(token_kind: &TokenKind) -> bool {
         | TokenKind::Keyword(KeywordKind::False)
         | TokenKind::Keyword(KeywordKind::If)
         | TokenKind::Keyword(KeywordKind::Null)
-        | TokenKind::Keyword(KeywordKind::Unsafe)
         | TokenKind::Punctuation(PunctuationKind::Hash)   // Tag expr
         | TokenKind::Punctuation(PunctuationKind::LParen)   // Parenthesized expr
         | TokenKind::Punctuation(PunctuationKind::LBrace)   // Codeblock or Struct expr
@@ -181,16 +180,6 @@ impl Parser {
                 Expr {
                     kind: ExprKind::Null,
                     span,
-                }
-            }
-            TokenKind::Keyword(KeywordKind::Unsafe) => {
-                let start_offset = self.offset;
-                self.consume_keyword(KeywordKind::Unsafe)?;
-                let codeblock = self.parse_codeblock_expr()?;
-                let span = self.get_span(start_offset, self.offset - 1)?;
-                Expr {
-                    span,
-                    kind: ExprKind::UnsafeBlock(codeblock),
                 }
             }
             TokenKind::Keyword(

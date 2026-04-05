@@ -105,7 +105,6 @@ pub enum ExprKind {
     },
     List(Vec<Expr>),
     CodeBlock(BlockContents),
-    UnsafeBlock(BlockContents),
 }
 
 #[derive(Clone, Debug, PartialEq)]
