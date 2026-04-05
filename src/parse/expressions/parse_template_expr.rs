@@ -44,12 +44,8 @@ impl Parser {
                 }
                 TokenKind::Punctuation(PunctuationKind::DollarLBrace) => {
                     self.consume_punctuation(PunctuationKind::DollarLBrace)?;
-
-                    // Parse whatever expression is inside the ${ ... }
                     let expr = self.parse_expr(0)?;
                     parts.push(expr);
-
-                    // The lexer emits a normal RBrace when the interpolation ends
                     self.consume_punctuation(PunctuationKind::RBrace)?;
                 }
                 _ => {

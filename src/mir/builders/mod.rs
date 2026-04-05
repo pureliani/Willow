@@ -86,13 +86,11 @@ pub enum FunctionBodyKind {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    // Signature
     pub id: DeclarationId,
     pub identifier: IdentifierNode,
     pub params: Vec<FunctionParam>,
     pub return_type: SpannedType,
     pub is_exported: bool,
-
     pub body: FunctionBodyKind,
 }
 

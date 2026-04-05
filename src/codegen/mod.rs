@@ -57,7 +57,6 @@ impl<'ctx, 'a> CodeGenerator<'ctx, 'a> {
         }
     }
 
-    /// The main entry point for code generation
     pub fn generate_ir(&mut self) {
         self.declare_functions();
 
