@@ -1,3 +1,26 @@
+use crate::compile::interner::TypeInterner;
+use crate::mir::statements::from::is_linkable_external_file;
+use crate::{
+    ast::{
+        decl::Declaration,
+        expr::{Expr, ExprKind},
+        stmt::{Stmt, StmtKind},
+        ModulePath, Span,
+    },
+    compile::file_cache::FileCache,
+    globals::STRING_INTERNER,
+    mir::{
+        builders::{Builder, InGlobal, Program},
+        errors::SemanticError,
+        utils::{
+            dump::dump_program,
+            points_to::PointsToGraph,
+            scope::{Scope, ScopeKind},
+        },
+    },
+    parse::{Parser, ParsingError},
+    tokenize::{TokenizationError, Tokenizer},
+};
 use inkwell::context::Context;
 use inkwell::targets::*;
 use inkwell::AddressSpace;
@@ -13,6 +36,37 @@ use std::{
 pub mod file_cache;
 pub mod interner;
 pub mod report_errors;
+
+fn get_runtime_files() -> Vec<PathBuf> {
+    let mut runtime_files = Vec::new();
+
+    let runtime_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("runtime");
+
+    if !runtime_dir.exists() {
+        panic!("INTERNAL COMPILER ERROR: Could not locate the runtime directory");
+    }
+
+    let mut dirs_to_visit = vec![runtime_dir];
+
+    while let Some(dir) = dirs_to_visit.pop() {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs_to_visit.push(path);
+                } else if is_linkable_external_file(
+                    path.extension().and_then(|e| e.to_str()),
+                ) {
+                    runtime_files.push(path);
+                }
+            }
+        }
+    }
+
+    runtime_files
+}
 
 pub struct CompileOptions {
     pub input: PathBuf,
@@ -50,29 +104,6 @@ impl CompileOptions {
         }
     }
 }
-
-use crate::compile::interner::TypeInterner;
-use crate::{
-    ast::{
-        decl::Declaration,
-        expr::{Expr, ExprKind},
-        stmt::{Stmt, StmtKind},
-        ModulePath, Span,
-    },
-    compile::file_cache::FileCache,
-    globals::STRING_INTERNER,
-    mir::{
-        builders::{Builder, InGlobal, Program},
-        errors::SemanticError,
-        utils::{
-            dump::dump_program,
-            points_to::PointsToGraph,
-            scope::{Scope, ScopeKind},
-        },
-    },
-    parse::{Parser, ParsingError},
-    tokenize::{TokenizationError, Tokenizer},
-};
 
 #[derive(Debug)]
 pub enum CompilerErrorKind {
@@ -276,6 +307,10 @@ impl Compiler {
 
         for foreign_file in &program.foreign_links {
             linker.arg(foreign_file);
+        }
+
+        for runtime_file in get_runtime_files() {
+            linker.arg(runtime_file);
         }
 
         linker.arg("-o").arg(&options.output);
