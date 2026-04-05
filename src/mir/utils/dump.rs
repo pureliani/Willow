@@ -3,7 +3,7 @@ use crate::{
     globals::STRING_INTERNER,
     mir::{
         builders::{
-            BasicBlockId, ExpectBody, Function, FunctionBodyKind, Program, ValueId,
+            BasicBlockId, ExpectBody, CheckedFunctionDecl, FunctionBodyKind, Program, ValueId,
         },
         instructions::{
             BinaryInstr, CallInstr, CastInstr, CompInstr, Instruction, MemoryInstr,
@@ -30,7 +30,7 @@ pub fn dump_program(program: &Program, interner: &TypeInterner) {
     println!("{}", out);
 }
 
-fn dump_function(f: &Function, p: &Program, interner: &TypeInterner, out: &mut String) {
+fn dump_function(f: &CheckedFunctionDecl, p: &Program, interner: &TypeInterner, out: &mut String) {
     let fn_name = STRING_INTERNER.resolve(f.identifier.name);
     let return_type = interner.to_string(f.return_type.id);
     writeln!(out, "fn {fn_name} -> {return_type}:").unwrap();
@@ -47,7 +47,7 @@ fn dump_function(f: &Function, p: &Program, interner: &TypeInterner, out: &mut S
 
 pub fn dump_block(
     block_id: &BasicBlockId,
-    f: &Function,
+    f: &CheckedFunctionDecl,
     p: &Program,
     interner: &TypeInterner,
     out: &mut String,

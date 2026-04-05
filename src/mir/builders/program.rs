@@ -8,7 +8,7 @@ use crate::{
     compile::ParallelParseResult,
     mir::{
         builders::{
-            Builder, Function, FunctionBodyKind, FunctionParam, InGlobal, InModule,
+            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InGlobal, InModule,
             Module,
         },
         types::checked_declaration::CheckedDeclaration,
@@ -103,7 +103,7 @@ impl<'a> Builder<'a, InModule> {
             })
             .collect();
 
-        let function = Function {
+        let function = CheckedFunctionDecl {
             id: f.id,
             identifier: f.identifier.clone(),
             params: function_params,

@@ -432,6 +432,10 @@ fn find_dependencies(
         match &stmt.kind {
             StmtKind::From { path, .. } => {
                 let relative_path_str = &path.value;
+                if relative_path_str == "std" || relative_path_str.starts_with("std") {
+                    continue;
+                }
+
                 let mut target_path = current_module_path.0.to_path_buf();
                 target_path.pop();
                 target_path.push(relative_path_str);

@@ -1,7 +1,9 @@
 use crate::{
     ast::{decl::FnDecl, stmt::ImportItem, ModulePath, Span, StringNode},
     mir::{
-        builders::{Builder, Function, FunctionBodyKind, FunctionParam, InModule},
+        builders::{
+            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InModule,
+        },
         errors::{SemanticError, SemanticErrorKind},
         types::checked_declaration::CheckedDeclaration,
     },
@@ -25,6 +27,13 @@ impl<'a> Builder<'a, InModule> {
                 kind: SemanticErrorKind::FromStatementMustBeDeclaredAtTopLevel,
                 span,
             });
+            return;
+        }
+
+        let path_str = &path.value;
+
+        if path_str == "std" || path_str.starts_with("std/") {
+            self.build_std_import(path_str, items, span);
             return;
         }
 
@@ -143,7 +152,7 @@ impl<'a> Builder<'a, InModule> {
             })
             .collect();
 
-        let function = Function {
+        let function = CheckedFunctionDecl {
             id: f.id,
             identifier: f.identifier.clone(),
             params: function_params,

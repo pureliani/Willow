@@ -7,7 +7,7 @@ use crate::{
     ast::{DeclarationId, IdentifierNode, Span},
     compile::interner::TypeId,
     mir::{
-        builders::{Function, ValueId},
+        builders::{CheckedFunctionDecl, ValueId},
         types::checked_type::SpannedType,
     },
     parse::DocAnnotation,
@@ -76,7 +76,7 @@ pub struct CheckedVarDecl {
 #[derive(Clone, Debug)]
 pub enum CheckedDeclaration {
     TypeAlias(CheckedTypeAliasDecl),
-    Function(Function),
+    Function(CheckedFunctionDecl),
     Var(CheckedVarDecl),
 }
 

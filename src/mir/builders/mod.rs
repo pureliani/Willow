@@ -27,6 +27,7 @@ pub mod function;
 pub mod memory;
 pub mod module;
 pub mod program;
+pub mod std_lib;
 pub mod unary;
 pub mod union;
 
@@ -85,7 +86,7 @@ pub enum FunctionBodyKind {
 }
 
 #[derive(Debug, Clone)]
-pub struct Function {
+pub struct CheckedFunctionDecl {
     pub id: DeclarationId,
     pub identifier: IdentifierNode,
     pub params: Vec<FunctionParam>,
@@ -99,7 +100,7 @@ pub trait ExpectBody {
     fn expect_body(self) -> Self::Output;
 }
 
-impl<'a> ExpectBody for &'a Function {
+impl<'a> ExpectBody for &'a CheckedFunctionDecl {
     type Output = &'a FunctionCFG;
     fn expect_body(self) -> Self::Output {
         match &self.body {
@@ -109,7 +110,7 @@ impl<'a> ExpectBody for &'a Function {
     }
 }
 
-impl<'a> ExpectBody for &'a mut Function {
+impl<'a> ExpectBody for &'a mut CheckedFunctionDecl {
     type Output = &'a mut FunctionCFG;
     fn expect_body(self) -> Self::Output {
         match &mut self.body {

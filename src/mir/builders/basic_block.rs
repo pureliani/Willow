@@ -3,7 +3,7 @@ use crate::{
     globals::next_value_id,
     mir::{
         builders::{
-            BasicBlock, BasicBlockId, Builder, ExpectBody, Function, InBlock, InFunction,
+            BasicBlock, BasicBlockId, Builder, ExpectBody, CheckedFunctionDecl, InBlock, InFunction,
             InGlobal, InModule, ValueId,
         },
         instructions::Terminator,
@@ -108,7 +108,7 @@ impl<'a> Builder<'a, InBlock> {
         self.get_bb(self.context.block_id)
     }
 
-    pub fn get_fn(&mut self) -> &mut Function {
+    pub fn get_fn(&mut self) -> &mut CheckedFunctionDecl {
         let func_id = self.context.func_id;
 
         match self.program.declarations.get_mut(&func_id).unwrap() {
