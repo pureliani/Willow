@@ -1,5 +1,9 @@
 use crate::{
-    ast::stmt::{Stmt, StmtKind},
+    ast::{
+        decl::FnDecl,
+        stmt::{ImportItem, Stmt, StmtKind},
+    },
+    globals::next_declaration_id,
     parse::{Parser, ParsingError},
     tokenize::{KeywordKind, PunctuationKind, TokenKind},
 };
@@ -12,18 +16,43 @@ impl Parser {
         let path = self.consume_string()?;
 
         self.consume_punctuation(PunctuationKind::LBrace)?;
-        let identifiers = self.comma_separated(
+        let items = self.comma_separated(
             |p| {
-                let identifier = p.consume_identifier()?;
-                let alias =
-                    if p.match_token(0, TokenKind::Punctuation(PunctuationKind::Col)) {
+                if p.match_token(0, TokenKind::Keyword(KeywordKind::Fn)) {
+                    let fn_start_offset = p.offset;
+
+                    let (identifier, params, return_type) = p.parse_fn_signature()?;
+
+                    let id = next_declaration_id();
+
+                    let body = crate::ast::expr::BlockContents {
+                        statements: vec![],
+                        final_expr: None,
+                        span: p.get_span(fn_start_offset, p.offset - 1)?,
+                    };
+
+                    Ok(ImportItem::ExternFn(FnDecl {
+                        id,
+                        documentation: None,
+                        identifier,
+                        params,
+                        return_type,
+                        body,
+                        is_exported: false,
+                    }))
+                } else {
+                    let identifier = p.consume_identifier()?;
+                    let alias = if p
+                        .match_token(0, TokenKind::Punctuation(PunctuationKind::Col))
+                    {
                         p.advance();
                         Some(p.consume_identifier()?)
                     } else {
                         None
                     };
 
-                Ok((identifier, alias))
+                    Ok(ImportItem::Symbol { identifier, alias })
+                }
             },
             |p| p.match_token(0, TokenKind::Punctuation(PunctuationKind::RBrace)),
         )?;
@@ -32,7 +61,7 @@ impl Parser {
         let span = self.get_span(start_offset, self.offset - 1)?;
 
         Ok(Stmt {
-            kind: StmtKind::From { path, identifiers },
+            kind: StmtKind::From { path, items },
             span,
         })
     }

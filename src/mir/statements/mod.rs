@@ -50,9 +50,9 @@ impl<'a> Builder<'a, InBlock> {
                 StmtKind::Assignment { target, value } => {
                     self.build_assignment_stmt(target, value)
                 }
-                StmtKind::From { path, identifiers } => {
+                StmtKind::From { path, items } => {
                     self.as_module()
-                        .build_from_stmt(path, identifiers, statement.span);
+                        .build_from_stmt(path, items, statement.span);
                 }
                 StmtKind::While { condition, body } => {
                     self.build_while_stmt(*condition, body)

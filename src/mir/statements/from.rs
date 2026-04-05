@@ -1,7 +1,7 @@
 use crate::{
-    ast::{IdentifierNode, ModulePath, Span, StringNode},
+    ast::{decl::FnDecl, stmt::ImportItem, ModulePath, Span, StringNode},
     mir::{
-        builders::{Builder, InModule},
+        builders::{Builder, Function, FunctionBodyKind, FunctionParam, InModule},
         errors::{SemanticError, SemanticErrorKind},
         types::checked_declaration::CheckedDeclaration,
     },
@@ -13,7 +13,7 @@ impl<'a> Builder<'a, InModule> {
     pub fn build_from_stmt(
         &mut self,
         path: StringNode,
-        identifiers: Vec<(IdentifierNode, Option<IdentifierNode>)>,
+        items: Vec<ImportItem>,
         span: Span,
     ) {
         if !self.current_scope.is_file_scope() {
@@ -29,7 +29,7 @@ impl<'a> Builder<'a, InModule> {
         target_path_buf.push(&path.value);
 
         let canonical_path = match target_path_buf.canonicalize() {
-            Ok(p) => ModulePath(Arc::new(p)),
+            Ok(p) => p,
             Err(_) => {
                 self.errors.push(SemanticError {
                     kind: SemanticErrorKind::ModuleNotFound(ModulePath(Arc::new(
@@ -37,50 +37,125 @@ impl<'a> Builder<'a, InModule> {
                     ))),
                     span: path.span,
                 });
-
                 return;
             }
         };
 
-        let target_module = match self.program.modules.get(&canonical_path) {
-            Some(m) => m,
-            None => {
-                self.errors.push(SemanticError {
-                    kind: SemanticErrorKind::ModuleNotFound(canonical_path),
-                    span: path.span,
-                });
+        let ext = canonical_path.extension().and_then(|e| e.to_str());
 
-                return;
+        match ext {
+            Some("c") | Some("o") | Some("a") => {
+                self.program.foreign_links.insert(canonical_path.clone());
+
+                for item in items {
+                    match item {
+                        ImportItem::ExternFn(f) => self.register_extern_fn(f),
+                        ImportItem::Symbol {
+                            identifier,
+                            alias: _,
+                        } => {
+                            self.errors.push(SemanticError {
+                                kind: SemanticErrorKind::UndeclaredIdentifier(
+                                    identifier.clone(),
+                                ),
+                                span: identifier.span,
+                            });
+                        }
+                    }
+                }
             }
-        };
-
-        for (imported_ident, alias) in identifiers {
-            let not_exported_err = SemanticError {
-                span: imported_ident.span.clone(),
-                kind: SemanticErrorKind::SymbolNotExported {
-                    module_path: canonical_path.clone(),
-                    symbol: imported_ident.clone(),
-                },
-            };
-
-            if let Some(decl_id) = target_module.root_scope.lookup(imported_ident.name) {
-                let is_exported = match self.program.declarations.get(&decl_id) {
-                    Some(CheckedDeclaration::Function(f)) => f.is_exported,
-                    Some(CheckedDeclaration::TypeAlias(t)) => t.is_exported,
-                    _ => false,
+            _ => {
+                let module_path = ModulePath(Arc::new(canonical_path.clone()));
+                let target_module = match self.program.modules.get(&module_path) {
+                    Some(m) => m,
+                    None => {
+                        self.errors.push(SemanticError {
+                            kind: SemanticErrorKind::ModuleNotFound(module_path),
+                            span: path.span,
+                        });
+                        return;
+                    }
                 };
 
-                if is_exported {
-                    let name_node = alias.unwrap_or(imported_ident);
-                    self.current_scope.map_name_to_decl(name_node.name, decl_id);
-                } else {
-                    self.errors.push(not_exported_err);
-                    continue;
+                for item in items {
+                    match item {
+                        ImportItem::Symbol {
+                            identifier: imported_ident,
+                            alias,
+                        } => {
+                            let not_exported_err = SemanticError {
+                                span: imported_ident.span.clone(),
+                                kind: SemanticErrorKind::SymbolNotExported {
+                                    module_path: module_path.clone(),
+                                    symbol: imported_ident.clone(),
+                                },
+                            };
+
+                            if let Some(decl_id) =
+                                target_module.root_scope.lookup(imported_ident.name)
+                            {
+                                let is_exported =
+                                    match self.program.declarations.get(&decl_id) {
+                                        Some(CheckedDeclaration::Function(f)) => {
+                                            f.is_exported
+                                        }
+                                        Some(CheckedDeclaration::TypeAlias(t)) => {
+                                            t.is_exported
+                                        }
+                                        _ => false,
+                                    };
+
+                                if is_exported {
+                                    let name_node = alias.unwrap_or(imported_ident);
+                                    self.current_scope
+                                        .map_name_to_decl(name_node.name, decl_id);
+                                } else {
+                                    self.errors.push(not_exported_err);
+                                }
+                            } else {
+                                self.errors.push(not_exported_err);
+                            }
+                        }
+                        ImportItem::ExternFn(f) => {
+                            self.errors.push(SemanticError {
+                                kind: SemanticErrorKind::UndeclaredIdentifier(
+                                    f.identifier.clone(),
+                                ),
+                                span: f.identifier.span,
+                            });
+                        }
+                    }
                 }
-            } else {
-                self.errors.push(not_exported_err);
-                continue;
             }
         }
+    }
+
+    fn register_extern_fn(&mut self, f: FnDecl) {
+        let checked_params = self.check_params(&f.params);
+        let checked_return_type = self.check_type_annotation(&f.return_type);
+
+        let function_params = checked_params
+            .into_iter()
+            .map(|p| FunctionParam {
+                identifier: p.identifier,
+                ty: p.ty,
+                decl_id: None,
+                value_id: None,
+            })
+            .collect();
+
+        let function = Function {
+            id: f.id,
+            identifier: f.identifier.clone(),
+            params: function_params,
+            return_type: checked_return_type,
+            is_exported: false,
+            body: FunctionBodyKind::External,
+        };
+
+        self.program
+            .declarations
+            .insert(f.id, CheckedDeclaration::Function(function));
+        self.current_scope.map_name_to_decl(f.identifier.name, f.id);
     }
 }

@@ -1,9 +1,18 @@
-use crate::ast::{IdentifierNode, Span, StringNode};
+use crate::ast::{decl::FnDecl, IdentifierNode, Span, StringNode};
 
 use super::{
     decl::{TypeAliasDecl, VarDecl},
     expr::{BlockContents, Expr},
 };
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ImportItem {
+    Symbol {
+        identifier: IdentifierNode,
+        alias: Option<IdentifierNode>,
+    },
+    ExternFn(FnDecl),
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtKind {
@@ -21,7 +30,7 @@ pub enum StmtKind {
     },
     From {
         path: StringNode,
-        identifiers: Vec<(IdentifierNode, Option<IdentifierNode>)>, // optional alias
+        items: Vec<ImportItem>,
     },
     While {
         condition: Box<Expr>,

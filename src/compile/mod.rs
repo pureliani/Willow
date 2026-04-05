@@ -199,6 +199,7 @@ impl Compiler {
             declarations: BTreeMap::new(),
             modules: BTreeMap::new(),
             value_types: BTreeMap::new(),
+            foreign_links: HashSet::new(),
             target_ptr_size,
             target_ptr_align,
         };
@@ -265,11 +266,21 @@ impl Compiler {
             return;
         }
 
-        let linker_status = std::process::Command::new("cc")
-            .arg(&obj_path)
-            .arg("-o")
-            .arg(&options.output)
-            .status();
+        if options.emit_obj {
+            return;
+        }
+
+        let mut linker = std::process::Command::new("cc");
+
+        linker.arg(&obj_path);
+
+        for foreign_file in &program.foreign_links {
+            linker.arg(foreign_file);
+        }
+
+        linker.arg("-o").arg(&options.output);
+
+        let linker_status = linker.status();
 
         let _ = std::fs::remove_file(&obj_path);
 
@@ -392,7 +403,10 @@ fn find_dependencies(
 
                 match fs::canonicalize(target_path.clone()) {
                     Ok(canonical_path) => {
-                        dependencies.insert(ModulePath(Arc::new(canonical_path)));
+                        let ext = canonical_path.extension().and_then(|e| e.to_str());
+                        if let Some("wl") = ext {
+                            dependencies.insert(ModulePath(Arc::new(canonical_path)));
+                        }
                     }
                     Err(e) => {
                         errors.push(CompilerErrorKind::ModuleNotFound {

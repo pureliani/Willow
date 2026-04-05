@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    path::PathBuf,
+};
 
 use crate::{
     ast::{DeclarationId, IdentifierNode, ModulePath},
@@ -47,6 +50,8 @@ pub struct Program {
 
     pub target_ptr_size: usize,
     pub target_ptr_align: usize,
+
+    pub foreign_links: HashSet<PathBuf>,
 }
 
 pub struct Module {

@@ -55,8 +55,8 @@ impl<'a> Builder<'a, InGlobal> {
 
             for stmt in m.statements {
                 match stmt.kind {
-                    StmtKind::From { path, identifiers } => {
-                        module_builder.build_from_stmt(path, identifiers, stmt.span);
+                    StmtKind::From { path, items } => {
+                        module_builder.build_from_stmt(path, items, stmt.span);
                     }
                     StmtKind::Expression(expr) => {
                         if let ExprKind::Fn(f) = expr.kind {
