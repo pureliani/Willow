@@ -9,6 +9,13 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum SemanticErrorKind {
     UnsupportedUnionNarrowing,
+    CannotInferGenericArgument(IdentifierNode),
+    ConflictingGenericBinding {
+        param_name: IdentifierNode,
+        expected: TypeId,
+        received: TypeId,
+    },
+    AmbiguousGenericInference,
     MainFunctionCannotHaveParameters,
     MainFunctionInvalidReturnType,
     MainFunctionMustBeInEntryFile,
@@ -175,6 +182,13 @@ impl SemanticErrorKind {
             }
             SemanticErrorKind::CannotApplyTypeArguments => SemanticErrorSeverity::Error,
             SemanticErrorKind::MissingGenericArguments => SemanticErrorSeverity::Error,
+            SemanticErrorKind::ConflictingGenericBinding { .. } => {
+                SemanticErrorSeverity::Error
+            }
+            SemanticErrorKind::AmbiguousGenericInference => SemanticErrorSeverity::Error,
+            SemanticErrorKind::CannotInferGenericArgument { .. } => {
+                SemanticErrorSeverity::Error
+            }
         }
     }
 
@@ -226,6 +240,9 @@ impl SemanticErrorKind {
             SemanticErrorKind::GenericArgumentCountMismatch { .. } => 46,
             SemanticErrorKind::CannotApplyTypeArguments => 47,
             SemanticErrorKind::MissingGenericArguments => 48,
+            SemanticErrorKind::ConflictingGenericBinding { .. } => 49,
+            SemanticErrorKind::AmbiguousGenericInference => 50,
+            SemanticErrorKind::CannotInferGenericArgument { .. } => 51,
         }
     }
 }

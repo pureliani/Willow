@@ -254,6 +254,36 @@ impl Compiler {
                         .with_labels(vec![Label::primary(file_id, range.clone())]);
 
                     match &e.kind {
+                        SemanticErrorKind::CannotInferGenericArgument(ident) => {
+                            let name = STRING_INTERNER.resolve(ident.name);
+                            diag.with_message("Cannot infer generic argument")
+                                .with_labels(vec![Label::primary(file_id, range)
+                                    .with_message(format!(
+                                        "Could not infer the type for generic parameter `{}`, please provide it explicitly",
+                                        name
+                                    ))])
+                        }
+                        SemanticErrorKind::AmbiguousGenericInference => diag
+                            .with_message("Ambiguous generic inference")
+                            .with_labels(vec![Label::primary(file_id, range)
+                                .with_message(
+                                    "Could not infer generic type arguments, please provide them explicitly",
+                                )]),
+                        SemanticErrorKind::ConflictingGenericBinding {
+                            param_name,
+                            expected,
+                            received,
+                        } => {
+                            let name = STRING_INTERNER.resolve(param_name.name);
+                            diag.with_message("Conflicting generic type inference")
+                                .with_labels(vec![Label::primary(file_id, range)
+                                    .with_message(format!(
+                                        "Generic parameter `{}` was inferred as `{}` here, but was previously inferred as `{}`",
+                                        name,
+                                        self.types.to_string(*received),
+                                        self.types.to_string(*expected)
+                                    ))])
+                        }
                         SemanticErrorKind::CannotGetLen(_ty) => {
                             diag.with_message("Cannot get length")
                         }

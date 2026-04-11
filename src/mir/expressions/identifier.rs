@@ -32,6 +32,12 @@ impl<'a> Builder<'a, InBlock> {
         };
 
         match symbol_id {
+            SymbolId::GenericParameter(_) => {
+                self.report_error_and_get_poison(SemanticError {
+                    span: identifier.span.clone(),
+                    kind: SemanticErrorKind::CannotUseTypeDeclarationAsValue,
+                })
+            }
             SymbolId::Concrete(decl_id) => {
                 let decl = self.program.declarations.get(&decl_id).unwrap();
 

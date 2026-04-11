@@ -18,6 +18,7 @@ pub enum ScopeKind {
         continue_target: BasicBlockId,
     },
     CodeBlock,
+    GenericParams,
     File,
     Global,
 }

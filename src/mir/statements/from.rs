@@ -130,6 +130,7 @@ impl<'a> Builder<'a, InModule> {
                                         _ => false,
                                     }
                                 }
+                                SymbolId::GenericParameter(_) => panic!("INTERNAL COMPILER ERROR: Generic parameters cannot be imported"),
                             };
 
                             if is_exported {

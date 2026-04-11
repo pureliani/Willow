@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     ast::{
         expr::{Expr, ExprKind},
@@ -7,17 +5,10 @@ use crate::{
         Span, SymbolId,
     },
     compile::interner::GenericSubstitutions,
-    globals::next_declaration_id,
     mir::{
-        builders::{
-            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InBlock,
-            ValueId,
-        },
+        builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
-        types::{
-            checked_declaration::{CheckedDeclaration, GenericDeclaration},
-            checked_type::SpannedType,
-        },
+        types::{checked_declaration::GenericDeclaration, checked_type::SpannedType},
     },
 };
 
@@ -59,11 +50,7 @@ impl<'a> Builder<'a, InBlock> {
                     .unwrap()
                     .clone();
 
-                if let GenericDeclaration::Function {
-                    decl: fn_decl,
-                    decl_scope,
-                } = generic_decl
-                {
+                if let GenericDeclaration::Function { decl: fn_decl, .. } = generic_decl {
                     if fn_decl.generic_params.len() != type_args.len() {
                         return self.report_error_and_get_poison(SemanticError {
                             span,
@@ -74,78 +61,19 @@ impl<'a> Builder<'a, InBlock> {
                         });
                     }
 
-                    let mut evaluated_args = Vec::new();
+                    let mut checked_type_args = Vec::new();
                     for arg in type_args {
-                        evaluated_args
+                        checked_type_args
                             .push(self.check_type_annotation(&arg, substitutions).id);
                     }
 
-                    let cache_key = (gen_id, evaluated_args.clone());
-                    if let Some(&concrete_id) =
-                        self.program.monomorphizations.get(&cache_key)
-                    {
-                        let result = self.emit_const_fn(concrete_id);
-                        return self.check_expected(result, span, expected_type);
-                    }
-
-                    let mut inner_substitutions = HashMap::new();
-                    for (param, arg_ty) in
-                        fn_decl.generic_params.iter().zip(evaluated_args)
-                    {
-                        inner_substitutions.insert(param.identifier.name, arg_ty);
-                    }
-
-                    let new_decl_id = next_declaration_id();
-                    self.program
-                        .monomorphizations
-                        .insert(cache_key, new_decl_id);
-
-                    let caller_scope = self.current_scope.clone();
-                    self.current_scope = decl_scope.clone();
-
-                    let checked_params =
-                        self.check_params(&fn_decl.params, &inner_substitutions);
-                    let checked_return_type = self.check_type_annotation(
-                        &fn_decl.return_type,
-                        &inner_substitutions,
+                    let concrete_id = self.monomorphize_function(
+                        gen_id,
+                        checked_type_args,
+                        span.clone(),
                     );
 
-                    let function_params = checked_params
-                        .into_iter()
-                        .map(|p| FunctionParam {
-                            identifier: p.identifier,
-                            ty: p.ty,
-                            decl_id: None,
-                            value_id: None,
-                        })
-                        .collect();
-
-                    let concrete_func = CheckedFunctionDecl {
-                        id: new_decl_id,
-                        identifier: fn_decl.identifier.clone(),
-                        params: function_params,
-                        return_type: checked_return_type,
-                        is_exported: false,
-                        body: FunctionBodyKind::NotBuilt,
-                    };
-
-                    self.program
-                        .declarations
-                        .insert(new_decl_id, CheckedDeclaration::Function(concrete_func));
-
-                    let mut concrete_ast = fn_decl.clone();
-                    concrete_ast.id = new_decl_id;
-
-                    if let Err(e) = self
-                        .as_module()
-                        .build_fn_body(concrete_ast, &inner_substitutions)
-                    {
-                        self.errors.push(e);
-                    }
-
-                    self.current_scope = caller_scope;
-
-                    let result = self.emit_const_fn(new_decl_id);
+                    let result = self.emit_const_fn(concrete_id);
                     self.check_expected(result, span, expected_type)
                 } else {
                     self.report_error_and_get_poison(SemanticError {
@@ -154,10 +82,11 @@ impl<'a> Builder<'a, InBlock> {
                     })
                 }
             }
-            SymbolId::Concrete(_) => self.report_error_and_get_poison(SemanticError {
-                span,
-                kind: SemanticErrorKind::CannotApplyTypeArguments,
-            }),
+            SymbolId::Concrete(_) | SymbolId::GenericParameter(_) => self
+                .report_error_and_get_poison(SemanticError {
+                    span,
+                    kind: SemanticErrorKind::CannotApplyTypeArguments,
+                }),
         }
     }
 }

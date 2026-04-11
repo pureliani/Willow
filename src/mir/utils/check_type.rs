@@ -7,6 +7,7 @@ use crate::{
         IdentifierNode, SymbolId,
     },
     compile::interner::{StringId, TypeId},
+    globals::STRING_INTERNER,
     mir::{
         builders::{Builder, BuilderContext},
         errors::{SemanticError, SemanticErrorKind},
@@ -17,7 +18,7 @@ use crate::{
             checked_type::{SpannedType, StructKind, Type},
             ordered_float::{OrderedF32, OrderedF64},
         },
-        utils::layout::pack_struct,
+        utils::{layout::pack_struct, scope::ScopeKind},
     },
 };
 
@@ -36,16 +37,14 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
             .collect()
     }
 
-    pub fn check_type_identifier_annotation(&mut self, id: IdentifierNode) -> TypeId {
+    pub fn check_type_identifier_annotation(
+        &mut self,
+        id: IdentifierNode,
+        substitutions: &HashMap<StringId, TypeId>,
+    ) -> TypeId {
         match self.current_scope.lookup(id.name) {
             Some(SymbolId::Concrete(decl_id)) => {
-                match self.program.declarations.get(&decl_id).unwrap_or_else(|| {
-                    panic!(
-                        "INTERNAL COMPILER ERROR: Expected declarations to contain \
-                         DeclarationId({}) key",
-                        decl_id.0
-                    )
-                }) {
+                match self.program.declarations.get(&decl_id).unwrap() {
                     CheckedDeclaration::TypeAlias(decl) => decl.value.id,
                     _ => {
                         self.errors.push(SemanticError {
@@ -62,6 +61,13 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
                     span: id.span.clone(),
                 });
                 self.types.unknown()
+            }
+            Some(SymbolId::GenericParameter(name)) => {
+                if let Some(&ty) = substitutions.get(&name) {
+                    ty
+                } else {
+                    panic!("INTERNAL COMPILER ERROR: Generic parameter {} found in scope but missing from substitutions map", STRING_INTERNER.resolve(name));
+                }
             }
             None => {
                 self.errors.push(SemanticError {
@@ -96,11 +102,7 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
             TypeAnnotationKind::F64(lit) => self.types.f64(lit.map(OrderedF64)),
             TypeAnnotationKind::String(lit) => self.types.string(*lit),
             TypeAnnotationKind::Identifier(id) => {
-                if let Some(&ty) = substitutions.get(&id.name) {
-                    ty
-                } else {
-                    self.check_type_identifier_annotation(id.clone())
-                }
+                self.check_type_identifier_annotation(id.clone(), substitutions)
             }
             TypeAnnotationKind::FnType {
                 params,
@@ -171,7 +173,20 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
                                         }
 
                                         let caller_scope = self.current_scope.clone();
-                                        self.current_scope = decl_scope;
+
+                                        self.current_scope = decl_scope.enter(
+                                            ScopeKind::GenericParams,
+                                            annotation.span.start,
+                                        );
+
+                                        for param in &decl.generic_params {
+                                            self.current_scope.map_name_to_symbol(
+                                                param.identifier.name,
+                                                SymbolId::GenericParameter(
+                                                    param.identifier.name,
+                                                ),
+                                            );
+                                        }
 
                                         let result_id = self
                                             .check_type_annotation(
@@ -196,7 +211,8 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
                                 }
                             }
                         }
-                        Some(SymbolId::Concrete(_)) => {
+                        Some(SymbolId::Concrete(_))
+                        | Some(SymbolId::GenericParameter(_)) => {
                             self.errors.push(SemanticError {
                                 span: left.span.clone(),
                                 kind: SemanticErrorKind::CannotApplyTypeArguments,

@@ -100,4 +100,5 @@ pub struct GenericDeclarationId(pub usize);
 pub enum SymbolId {
     Concrete(DeclarationId),
     Generic(GenericDeclarationId),
+    GenericParameter(StringId),
 }

@@ -1,5 +1,8 @@
 from "std/io" { print }
 
-fn main() {
-    print("Hello world!");
+type Foo<T> = { value: T };
+
+fn main() { 
+    let x: Foo<string> = { value: "hello world" };
+    print(x.value);
 }

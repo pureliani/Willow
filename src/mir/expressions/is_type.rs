@@ -54,7 +54,7 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::Identifier(ident) => {
                 match self.current_scope.lookup(ident.name)? {
                     SymbolId::Concrete(decl_id) => Some(Place::Var(decl_id)),
-                    SymbolId::Generic(_) => None,
+                    SymbolId::Generic(_) | SymbolId::GenericParameter(_) => None,
                 }
             }
             ExprKind::Access { left, field } => {

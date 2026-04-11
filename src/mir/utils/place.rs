@@ -97,10 +97,12 @@ impl<'a> Builder<'a, InBlock> {
                         }),
                     }
                 }
-                Some(SymbolId::Generic(_)) => Err(SemanticError {
-                    kind: SemanticErrorKind::InvalidLValue,
-                    span,
-                }),
+                Some(SymbolId::Generic(_)) | Some(SymbolId::GenericParameter(_)) => {
+                    Err(SemanticError {
+                        kind: SemanticErrorKind::InvalidLValue,
+                        span,
+                    })
+                }
                 None => Err(SemanticError {
                     kind: SemanticErrorKind::UndeclaredIdentifier(ident),
                     span,
