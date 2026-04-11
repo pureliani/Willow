@@ -55,6 +55,7 @@ fn suffix_bp(token_kind: &TokenKind) -> Option<(u8, ())> {
         Punctuation(LParen) => (14, ()),    // fn call
         Punctuation(Dot) => (14, ()),       // member access
         Punctuation(DoubleCol) => (14, ()), // static member accesses
+        Punctuation(Lt) => (14, ()),        // generic instantiation
         _ => return None,
     };
 
@@ -221,6 +222,51 @@ impl Parser {
                 let lhs_clone = lhs.clone();
 
                 let new_lhs = match op.kind {
+                    TokenKind::Punctuation(PunctuationKind::Lt) => {
+                        self.place_checkpoint();
+                        self.advance();
+                        let args_result = self.comma_separated(
+                            |p| p.parse_type_annotation(0),
+                            |p| {
+                                p.match_token(
+                                    0,
+                                    TokenKind::Punctuation(PunctuationKind::Gt),
+                                )
+                            },
+                        );
+
+                        let mut success = false;
+                        let mut args = Vec::new();
+                        if let Ok(parsed_args) = args_result {
+                            if self.match_token(
+                                0,
+                                TokenKind::Punctuation(PunctuationKind::Gt),
+                            ) {
+                                self.advance();
+                                success = true;
+                                args = parsed_args;
+                            }
+                        }
+
+                        if success {
+                            let end_pos = self.tokens[self.offset - 1].span.end;
+                            let span = Span {
+                                start: lhs_clone.span.start,
+                                end: end_pos,
+                                path: self.path.clone(),
+                            };
+                            Some(Expr {
+                                kind: ExprKind::GenericApply {
+                                    left: Box::new(lhs_clone),
+                                    type_args: args,
+                                },
+                                span,
+                            })
+                        } else {
+                            self.goto_checkpoint();
+                            break;
+                        }
+                    }
                     TokenKind::Punctuation(PunctuationKind::Dot) => {
                         self.consume_punctuation(PunctuationKind::Dot)?;
 

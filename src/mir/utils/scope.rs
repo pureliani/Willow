@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    ast::{DeclarationId, Position, Span},
+    ast::{Position, Span, SymbolId},
     compile::interner::StringId,
     mir::builders::{BasicBlockId, LoopJumpTargets},
 };
@@ -18,16 +18,14 @@ pub enum ScopeKind {
         continue_target: BasicBlockId,
     },
     CodeBlock,
-    UnsafeBlock,
     File,
-    GenericParams, // Not used for now
     Global,
 }
 
 #[derive(Debug)]
 struct ScopeData {
     kind: ScopeKind,
-    symbols: HashMap<StringId, DeclarationId>,
+    symbols: HashMap<StringId, SymbolId>,
     parent: Option<Weak<RefCell<ScopeData>>>,
     children: Vec<Scope>,
     span: Span,
@@ -77,7 +75,7 @@ impl Scope {
         self.0.borrow().parent.as_ref()?.upgrade().map(Scope)
     }
 
-    pub fn lookup(&self, name: StringId) -> Option<DeclarationId> {
+    pub fn lookup(&self, name: StringId) -> Option<SymbolId> {
         if let Some(id) = self.0.borrow().symbols.get(&name) {
             return Some(*id);
         }
@@ -85,7 +83,7 @@ impl Scope {
         self.parent()?.lookup(name)
     }
 
-    pub fn map_name_to_decl(&self, name: StringId, id: DeclarationId) {
+    pub fn map_name_to_symbol(&self, name: StringId, id: SymbolId) {
         let mut data = self.0.borrow_mut();
         if let Entry::Vacant(e) = data.symbols.entry(name) {
             e.insert(id);
@@ -104,27 +102,10 @@ impl Scope {
             return true;
         }
 
-        if matches!(
-            kind,
-            ScopeKind::CodeBlock | ScopeKind::UnsafeBlock | ScopeKind::WhileBody { .. }
-        ) {
+        if matches!(kind, ScopeKind::CodeBlock | ScopeKind::WhileBody { .. }) {
             return self
                 .parent()
                 .is_some_and(|parent| parent.within_function_body());
-        }
-
-        false
-    }
-
-    pub fn is_in_unsafe(&self) -> bool {
-        let kind = self.0.borrow().kind;
-
-        if let ScopeKind::UnsafeBlock = kind {
-            return true;
-        }
-
-        if let Some(parent) = self.parent() {
-            return parent.is_in_unsafe();
         }
 
         false
@@ -143,7 +124,7 @@ impl Scope {
             });
         }
 
-        if matches!(kind, ScopeKind::CodeBlock | ScopeKind::UnsafeBlock) {
+        if matches!(kind, ScopeKind::CodeBlock) {
             return self.parent().and_then(|parent| parent.within_loop_body());
         }
 

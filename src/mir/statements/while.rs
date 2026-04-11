@@ -1,5 +1,6 @@
 use crate::{
     ast::expr::{BlockContents, Expr},
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock},
         types::checked_type::SpannedType,
@@ -8,7 +9,12 @@ use crate::{
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_while_stmt(&mut self, condition: Expr, body: BlockContents) {
+    pub fn build_while_stmt(
+        &mut self,
+        condition: Expr,
+        body: BlockContents,
+        substitutions: &GenericSubstitutions,
+    ) {
         let header_block_id = self.as_fn().new_bb();
         let body_block_id = self.as_fn().new_bb();
         let exit_block_id = self.as_fn().new_bb();
@@ -23,6 +29,7 @@ impl<'a> Builder<'a, InBlock> {
                 id: self.types.bool(None),
                 span: condition_span,
             }),
+            substitutions,
         );
 
         self.emit_cond_jmp(cond_id, body_block_id, exit_block_id);
@@ -38,9 +45,9 @@ impl<'a> Builder<'a, InBlock> {
             body.span.start,
         );
 
-        self.build_statements(body.statements);
+        self.build_statements(body.statements, substitutions);
         if let Some(final_expr) = body.final_expr {
-            self.build_expr(*final_expr, None);
+            self.build_expr(*final_expr, None, substitutions);
         }
 
         self.current_scope = self

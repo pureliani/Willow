@@ -18,6 +18,7 @@ pub enum SemanticErrorKind {
     DuplicateIdentifier(IdentifierNode),
     CannotIndex(TypeId),
     FromStatementMustBeDeclaredAtTopLevel,
+    MissingGenericArguments,
     ModuleNotFound(ModulePath),
     CannotDeclareGlobalVariable,
     DuplicateStructFieldInitializer(IdentifierNode),
@@ -55,8 +56,12 @@ pub enum SemanticErrorKind {
         expected: usize,
         received: usize,
     },
-    CannotUseVariableDeclarationAsType,
-    CannotUseFunctionDeclarationAsType,
+    GenericArgumentCountMismatch {
+        expected: usize,
+        received: usize,
+    },
+    CannotApplyTypeArguments,
+    IdentifierIsNotAType(IdentifierNode),
     CannotUseTypeDeclarationAsValue,
     TypeAliasMustBeDeclaredAtTopLevel,
     IfExpressionMissingElse,
@@ -106,9 +111,6 @@ impl SemanticErrorKind {
             SemanticErrorKind::UndeclaredType { .. } => SemanticErrorSeverity::Error,
             SemanticErrorKind::CannotAccess { .. } => SemanticErrorSeverity::Error,
             SemanticErrorKind::CannotCall { .. } => SemanticErrorSeverity::Error,
-            SemanticErrorKind::CannotUseVariableDeclarationAsType => {
-                SemanticErrorSeverity::Error
-            }
             SemanticErrorKind::AccessToUndefinedField { .. } => {
                 SemanticErrorSeverity::Error
             }
@@ -146,7 +148,7 @@ impl SemanticErrorKind {
                 SemanticErrorSeverity::Error
             }
             SemanticErrorKind::ModuleNotFound { .. } => SemanticErrorSeverity::Error,
-            SemanticErrorKind::CannotUseFunctionDeclarationAsType => {
+            SemanticErrorKind::IdentifierIsNotAType { .. } => {
                 SemanticErrorSeverity::Error
             }
             SemanticErrorKind::SymbolNotExported { .. } => SemanticErrorSeverity::Error,
@@ -168,6 +170,11 @@ impl SemanticErrorKind {
             SemanticErrorKind::MainFunctionMustBeInEntryFile => {
                 SemanticErrorSeverity::Error
             }
+            SemanticErrorKind::GenericArgumentCountMismatch { .. } => {
+                SemanticErrorSeverity::Error
+            }
+            SemanticErrorKind::CannotApplyTypeArguments => SemanticErrorSeverity::Error,
+            SemanticErrorKind::MissingGenericArguments => SemanticErrorSeverity::Error,
         }
     }
 
@@ -187,7 +194,6 @@ impl SemanticErrorKind {
             SemanticErrorKind::UndeclaredType { .. } => 12,
             SemanticErrorKind::CannotAccess { .. } => 13,
             SemanticErrorKind::CannotCall { .. } => 14,
-            SemanticErrorKind::CannotUseVariableDeclarationAsType => 15,
             SemanticErrorKind::AccessToUndefinedField { .. } => 16,
             SemanticErrorKind::FnArgumentCountMismatch { .. } => 17,
             SemanticErrorKind::TypeAliasMustBeDeclaredAtTopLevel => 18,
@@ -205,7 +211,7 @@ impl SemanticErrorKind {
             SemanticErrorKind::UnreachableCode => 30,
             SemanticErrorKind::FromStatementMustBeDeclaredAtTopLevel => 31,
             SemanticErrorKind::ModuleNotFound { .. } => 32,
-            SemanticErrorKind::CannotUseFunctionDeclarationAsType => 33,
+            SemanticErrorKind::IdentifierIsNotAType { .. } => 33,
             SemanticErrorKind::SymbolNotExported { .. } => 34,
             SemanticErrorKind::ClosuresNotSupportedYet => 35,
             SemanticErrorKind::ValuedTagInIsExpression => 36,
@@ -217,6 +223,9 @@ impl SemanticErrorKind {
             SemanticErrorKind::MainFunctionInvalidReturnType => 43,
             SemanticErrorKind::MainFunctionMustBeInEntryFile => 44,
             SemanticErrorKind::MainFunctionCannotHaveParameters => 45,
+            SemanticErrorKind::GenericArgumentCountMismatch { .. } => 46,
+            SemanticErrorKind::CannotApplyTypeArguments => 47,
+            SemanticErrorKind::MissingGenericArguments => 48,
         }
     }
 }

@@ -507,18 +507,13 @@ impl Compiler {
                                         expected, s, received
                                     ))])
                         }
-                        SemanticErrorKind::CannotUseVariableDeclarationAsType => diag
-                            .with_message("Cannot use variable declaration as a type")
+                        SemanticErrorKind::IdentifierIsNotAType(id) => diag
+                            .with_message("Identifier is not a type")
                             .with_labels(vec![Label::primary(file_id, range)
-                                .with_message(
-                                    "Cannot use variable declaration as a type",
-                                )]),
-                        SemanticErrorKind::CannotUseFunctionDeclarationAsType => diag
-                            .with_message("Expected type, found function")
-                            .with_labels(vec![Label::primary(file_id, range)
-                                .with_message(
-                                    "Cannot use a function declaration as a type",
-                                )]),
+                                .with_message(format!(
+                                    "Identifier `{}` is not a type",
+                                    STRING_INTERNER.resolve(id.name)
+                                ))]),
                         SemanticErrorKind::CannotUseTypeDeclarationAsValue => diag
                             .with_message("Expected value, found type")
                             .with_labels(vec![Label::primary(file_id, range)
@@ -591,6 +586,30 @@ impl Compiler {
                                     "main can only be defined in the entry file passed \
                                      to the compiler",
                                 )]),
+                        SemanticErrorKind::GenericArgumentCountMismatch {
+                            expected,
+                            received,
+                        } => {
+                            let s = if *expected > 1 { "s" } else { "" };
+                            diag.with_message("Type argument count mismatch")
+                                .with_labels(vec![Label::primary(file_id, range)
+                                    .with_message(format!(
+                                        "This generic expects {} argument{}, but \
+                                         instead received {}",
+                                        expected, s, received
+                                    ))])
+                        }
+                        SemanticErrorKind::CannotApplyTypeArguments => diag
+                            .with_message("Cannot apply type arguments")
+                            .with_labels(vec![Label::primary(file_id, range)
+                                .with_message(
+                                    "main can only be defined in the entry file passed \
+                                     to the compiler",
+                                )]),
+                        SemanticErrorKind::MissingGenericArguments => diag
+                            .with_message("Expected generic type arguments")
+                            .with_labels(vec![Label::primary(file_id, range)
+                                .with_message("Expected generic type arguments")]),
                     }
                 }
                 CompilerErrorKind::CouldNotReadFile { path, error } => {

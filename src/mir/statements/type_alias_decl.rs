@@ -1,14 +1,23 @@
 use crate::{
-    ast::{decl::TypeAliasDecl, Span},
+    ast::{decl::TypeAliasDecl, Span, SymbolId},
+    compile::interner::GenericSubstitutions,
+    globals::next_generic_declaration_id,
     mir::{
         builders::{Builder, InModule},
         errors::{SemanticError, SemanticErrorKind},
-        types::checked_declaration::{CheckedDeclaration, CheckedTypeAliasDecl},
+        types::checked_declaration::{
+            CheckedDeclaration, CheckedTypeAliasDecl, GenericDeclaration,
+        },
     },
 };
 
 impl<'a> Builder<'a, InModule> {
-    pub fn build_type_alias_decl(&mut self, type_alias_decl: TypeAliasDecl, span: Span) {
+    pub fn build_type_alias_decl(
+        &mut self,
+        type_alias_decl: TypeAliasDecl,
+        span: Span,
+        substitutions: &GenericSubstitutions,
+    ) {
         if !self.current_scope.is_file_scope() {
             self.errors.push(SemanticError {
                 kind: SemanticErrorKind::TypeAliasMustBeDeclaredAtTopLevel,
@@ -17,10 +26,31 @@ impl<'a> Builder<'a, InModule> {
             return;
         }
 
-        let resolved_type = self.check_type_annotation(&type_alias_decl.value);
+        let decl_name = type_alias_decl.identifier.name;
+
+        if !type_alias_decl.generic_params.is_empty() {
+            let gen_id = next_generic_declaration_id();
+
+            self.program.generic_declarations.insert(
+                gen_id,
+                GenericDeclaration::TypeAlias {
+                    decl: type_alias_decl,
+                    decl_scope: self.current_scope.clone(),
+                },
+            );
+
+            self.current_scope
+                .map_name_to_symbol(decl_name, SymbolId::Generic(gen_id));
+            return;
+        }
+
+        let resolved_type =
+            self.check_type_annotation(&type_alias_decl.value, substitutions);
+
+        let decl_id = type_alias_decl.id;
 
         let checked_type_alias_decl = CheckedTypeAliasDecl {
-            id: type_alias_decl.id,
+            id: decl_id,
             documentation: type_alias_decl.documentation,
             identifier: type_alias_decl.identifier.clone(),
             span,
@@ -29,11 +59,11 @@ impl<'a> Builder<'a, InModule> {
         };
 
         self.program.declarations.insert(
-            type_alias_decl.id,
+            decl_id,
             CheckedDeclaration::TypeAlias(checked_type_alias_decl),
         );
 
         self.current_scope
-            .map_name_to_decl(type_alias_decl.identifier.name, type_alias_decl.id);
+            .map_name_to_symbol(decl_name, SymbolId::Concrete(decl_id));
     }
 }

@@ -18,6 +18,7 @@ fn suffix_bp(token_kind: &TokenKind) -> Option<(u8, ())> {
 
     let priority = match token_kind {
         Punctuation(LBracket) => (3, ()),
+        Punctuation(Lt) => (3, ()),
         _ => return None,
     };
 
@@ -256,6 +257,8 @@ impl Parser {
                     break;
                 }
 
+                let lhs_clone = lhs.clone();
+
                 lhs = match op.kind {
                     TokenKind::Punctuation(PunctuationKind::LBracket) => {
                         self.consume_punctuation(PunctuationKind::LBracket)?;
@@ -266,6 +269,51 @@ impl Parser {
                         TypeAnnotation {
                             kind: TypeAnnotationKind::List(Box::new(lhs.clone())),
                             span,
+                        }
+                    }
+                    TokenKind::Punctuation(PunctuationKind::Lt) => {
+                        self.place_checkpoint();
+                        self.advance();
+                        let args_result = self.comma_separated(
+                            |p| p.parse_type_annotation(0),
+                            |p| {
+                                p.match_token(
+                                    0,
+                                    TokenKind::Punctuation(PunctuationKind::Gt),
+                                )
+                            },
+                        );
+
+                        let mut success = false;
+                        let mut args = Vec::new();
+                        if let Ok(parsed_args) = args_result {
+                            if self.match_token(
+                                0,
+                                TokenKind::Punctuation(PunctuationKind::Gt),
+                            ) {
+                                self.advance();
+                                success = true;
+                                args = parsed_args;
+                            }
+                        }
+
+                        if success {
+                            let end_pos = self.tokens[self.offset - 1].span.end;
+                            let span = Span {
+                                start: lhs_clone.span.start,
+                                end: end_pos,
+                                path: self.path.clone(),
+                            };
+                            TypeAnnotation {
+                                kind: TypeAnnotationKind::GenericApply {
+                                    left: Box::new(lhs_clone),
+                                    args,
+                                },
+                                span,
+                            }
+                        } else {
+                            self.goto_checkpoint();
+                            break;
                         }
                     }
                     _ => {

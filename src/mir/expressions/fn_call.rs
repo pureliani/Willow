@@ -5,7 +5,7 @@ use crate::{
         expr::{Expr, ExprKind},
         DeclarationId, Span,
     },
-    compile::interner::TypeId,
+    compile::interner::{GenericSubstitutions, TypeId},
     mir::{
         builders::{Builder, FunctionBodyKind, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -24,13 +24,14 @@ impl<'a> Builder<'a, InBlock> {
         args: Vec<Expr>,
         span: Span,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let callee_decl_id = match &left.kind {
             ExprKind::Identifier(ident) => self.current_scope.lookup(ident.name),
             _ => None,
         };
 
-        let func_id = self.build_expr(left, None);
+        let func_id = self.build_expr(left, None, substitutions);
         let func_type = self.get_value_type(func_id);
 
         let (params, return_type) = match self.types.resolve(func_type) {
@@ -82,7 +83,8 @@ impl<'a> Builder<'a, InBlock> {
         for (arg_expr, checked_param) in args.iter().zip(params) {
             let arg_span = arg_expr.span.clone();
 
-            let val_id = self.build_expr(arg_expr.clone(), Some(&checked_param.ty));
+            let val_id =
+                self.build_expr(arg_expr.clone(), Some(&checked_param.ty), substitutions);
             let val_ty = self.get_value_type(val_id);
 
             if val_ty == self.types.unknown() {

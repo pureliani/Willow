@@ -1,5 +1,6 @@
 use crate::{
     ast::{expr::Expr, IdentifierNode},
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -13,10 +14,11 @@ impl<'a> Builder<'a, InBlock> {
         left: Expr,
         field: IdentifierNode,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let span = field.span.clone();
 
-        let left_id = self.build_expr(left, None);
+        let left_id = self.build_expr(left, None, substitutions);
         let left_type = self.get_value_type(left_id);
 
         let result = self.report_error_and_get_poison(SemanticError {

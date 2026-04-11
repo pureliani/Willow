@@ -1,15 +1,18 @@
+use std::collections::HashMap;
+
 use crate::{
     ast::{
         decl::{Declaration, FnDecl},
         expr::ExprKind,
         stmt::StmtKind,
-        ModulePath, Position,
+        ModulePath, Position, SymbolId,
     },
     compile::ParallelParseResult,
+    globals::next_generic_declaration_id,
     mir::{
         builders::{
-            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InGlobal,
-            InModule, Module,
+            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam,
+            GenericDeclaration, InGlobal, InModule, Module,
         },
         types::checked_declaration::CheckedDeclaration,
         utils::scope::ScopeKind,
@@ -32,6 +35,8 @@ impl<'a> Builder<'a, InGlobal> {
             );
         }
 
+        let empty_subs = HashMap::new();
+
         for m in &modules {
             let mut module_builder = self.as_module(m.path.clone());
 
@@ -41,6 +46,7 @@ impl<'a> Builder<'a, InGlobal> {
                         module_builder.build_type_alias_decl(
                             alias.clone(),
                             alias.identifier.span.clone(),
+                            &empty_subs,
                         );
                     }
                     Declaration::Fn(f) => {
@@ -60,7 +66,8 @@ impl<'a> Builder<'a, InGlobal> {
                     }
                     StmtKind::Expression(expr) => {
                         if let ExprKind::Fn(f) = expr.kind {
-                            if let Err(e) = module_builder.build_fn_body(*f) {
+                            if let Err(e) = module_builder.build_fn_body(*f, &empty_subs)
+                            {
                                 module_builder.errors.push(e);
                             };
                         }
@@ -89,8 +96,27 @@ impl<'a> Builder<'a, InGlobal> {
 
 impl<'a> Builder<'a, InModule> {
     fn register_fn_signature(&mut self, f: &FnDecl) {
-        let checked_params = self.check_params(&f.params);
-        let checked_return_type = self.check_type_annotation(&f.return_type);
+        let decl_name = f.identifier.name;
+
+        if !f.generic_params.is_empty() {
+            let gen_id = next_generic_declaration_id();
+
+            self.program.generic_declarations.insert(
+                gen_id,
+                GenericDeclaration::Function {
+                    decl: f.clone(),
+                    decl_scope: self.current_scope.clone(),
+                },
+            );
+
+            self.current_scope
+                .map_name_to_symbol(decl_name, SymbolId::Generic(gen_id));
+            return;
+        }
+
+        let empty_subs = HashMap::new();
+        let checked_params = self.check_params(&f.params, &empty_subs);
+        let checked_return_type = self.check_type_annotation(&f.return_type, &empty_subs);
 
         let function_params = checked_params
             .into_iter()
@@ -102,8 +128,10 @@ impl<'a> Builder<'a, InModule> {
             })
             .collect();
 
+        let decl_id = f.id;
+
         let function = CheckedFunctionDecl {
-            id: f.id,
+            id: decl_id,
             identifier: f.identifier.clone(),
             params: function_params,
             return_type: checked_return_type,
@@ -113,7 +141,9 @@ impl<'a> Builder<'a, InModule> {
 
         self.program
             .declarations
-            .insert(f.id, CheckedDeclaration::Function(function));
-        self.current_scope.map_name_to_decl(f.identifier.name, f.id);
+            .insert(decl_id, CheckedDeclaration::Function(function));
+
+        self.current_scope
+            .map_name_to_symbol(decl_name, SymbolId::Concrete(decl_id));
     }
 }

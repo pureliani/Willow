@@ -3,7 +3,9 @@ use crate::{
     compile::interner::TypeId,
     globals::{next_declaration_id, STRING_INTERNER},
     mir::{
-        builders::{Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InModule},
+        builders::{
+            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InModule,
+        },
         errors::{SemanticError, SemanticErrorKind},
         types::{
             checked_declaration::CheckedDeclaration,
@@ -36,7 +38,7 @@ impl<'a> Builder<'a, InModule> {
                             .insert(decl_id, CheckedDeclaration::Function(func));
 
                         let name_to_bind = alias.unwrap_or(identifier).name;
-                        self.current_scope.map_name_to_decl(name_to_bind, decl_id);
+                        self.current_scope.map_name_to_symbol(name_to_bind, decl_id);
                     } else {
                         self.errors.push(SemanticError {
                             kind: SemanticErrorKind::UndeclaredIdentifier(

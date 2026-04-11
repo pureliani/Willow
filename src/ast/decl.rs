@@ -6,6 +6,12 @@ use crate::{
 use super::{expr::Expr, type_annotation::TypeAnnotation};
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct GenericParam {
+    pub identifier: IdentifierNode,
+    pub constraint: Option<TypeAnnotation>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Param {
     pub identifier: IdentifierNode,
     pub constraint: TypeAnnotation,
@@ -16,6 +22,7 @@ pub struct FnDecl {
     pub id: DeclarationId,
     pub documentation: Option<DocAnnotation>,
     pub identifier: IdentifierNode,
+    pub generic_params: Vec<GenericParam>,
     pub params: Vec<Param>,
     pub return_type: TypeAnnotation,
     pub body: BlockContents,
@@ -27,6 +34,7 @@ pub struct TypeAliasDecl {
     pub id: DeclarationId,
     pub documentation: Option<DocAnnotation>,
     pub identifier: IdentifierNode,
+    pub generic_params: Vec<GenericParam>,
     pub value: TypeAnnotation,
     pub is_exported: bool,
 }

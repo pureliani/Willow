@@ -1,5 +1,6 @@
 use crate::{
     ast::{expr::Expr, Span},
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock, ValueId},
         errors::SemanticError,
@@ -14,16 +15,17 @@ impl<'a> Builder<'a, InBlock> {
         right: Expr,
         op: F,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId
     where
         F: FnOnce(&mut Self, ValueId, ValueId) -> ValueId,
     {
         let left_span = left.span.clone();
-        let left_value = self.build_expr(left, None);
+        let left_value = self.build_expr(left, None, substitutions);
         let left_type = self.get_value_type(left_value);
 
         let right_span = right.span.clone();
-        let right_value = self.build_expr(right, None);
+        let right_value = self.build_expr(right, None, substitutions);
         let right_type = self.get_value_type(right_value);
 
         let supertype = match self.arithmetic_supertype(

@@ -1,5 +1,6 @@
 use crate::{
     ast::{expr::Expr, Span},
+    compile::interner::GenericSubstitutions,
     globals::COMMON_IDENTIFIERS,
     mir::{
         builders::{Builder, InBlock, ValueId},
@@ -14,6 +15,7 @@ impl<'a> Builder<'a, InBlock> {
         expr_span: Span,
         items: Vec<Expr>,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let mut item_values = Vec::with_capacity(items.len());
         let mut element_types = Vec::with_capacity(items.len());
@@ -40,7 +42,8 @@ impl<'a> Builder<'a, InBlock> {
         };
 
         for item in items {
-            let val_id = self.build_expr(item, expected_element_type.as_ref());
+            let val_id =
+                self.build_expr(item, expected_element_type.as_ref(), substitutions);
             let ty = self.get_value_type(val_id);
 
             item_values.push(val_id);

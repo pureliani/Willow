@@ -1,3 +1,4 @@
+use crate::codegen::CodeGenerator;
 use crate::compile::interner::TypeInterner;
 use crate::mir::statements::from::is_linkable_external_file;
 use crate::{
@@ -232,6 +233,8 @@ impl Compiler {
             foreign_links: HashSet::new(),
             target_ptr_size,
             target_ptr_align,
+            generic_declarations: BTreeMap::new(),
+            monomorphizations: BTreeMap::new(),
         };
 
         let global_scope = Scope::new_root(ScopeKind::Global, Span::default());
@@ -273,12 +276,8 @@ impl Compiler {
         }
 
         // Codegen
-        let mut codegen = crate::codegen::CodeGenerator::new(
-            &context,
-            &program,
-            &self.types,
-            target_machine,
-        );
+        let mut codegen =
+            CodeGenerator::new(&context, &program, &self.types, target_machine);
 
         if options.emit_llvm_ir {
             codegen.generate_ir();

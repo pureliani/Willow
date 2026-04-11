@@ -1,5 +1,6 @@
 use crate::{
     ast::{expr::Expr, IdentifierNode},
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock, ValueId},
         types::checked_type::SpannedType,
@@ -12,9 +13,10 @@ impl<'a> Builder<'a, InBlock> {
         left: Expr,
         field: IdentifierNode,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let field_span = field.span.clone();
-        let base_ptr = self.build_expr(left, None);
+        let base_ptr = self.build_expr(left, None, substitutions);
         let field_ptr = match self.try_get_field_ptr(base_ptr, &field, false) {
             Ok(ptr) => ptr,
             Err(e) => return self.report_error_and_get_poison(e),

@@ -4,11 +4,15 @@ use std::{
 };
 
 use crate::{
-    ast::{DeclarationId, IdentifierNode, Span},
+    ast::{
+        decl::{FnDecl, TypeAliasDecl},
+        DeclarationId, IdentifierNode, Span,
+    },
     compile::interner::TypeId,
     mir::{
         builders::{CheckedFunctionDecl, ValueId},
         types::checked_type::SpannedType,
+        utils::scope::Scope,
     },
     parse::DocAnnotation,
 };
@@ -71,6 +75,18 @@ pub struct CheckedVarDecl {
     pub documentation: Option<DocAnnotation>,
     pub constraint_span: Span,
     pub stack_ptr: ValueId,
+}
+
+#[derive(Clone, Debug)]
+pub enum GenericDeclaration {
+    TypeAlias {
+        decl: TypeAliasDecl,
+        decl_scope: Scope,
+    },
+    Function {
+        decl: FnDecl,
+        decl_scope: Scope,
+    },
 }
 
 #[derive(Clone, Debug)]

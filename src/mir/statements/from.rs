@@ -1,13 +1,14 @@
 use crate::{
-    ast::{decl::FnDecl, stmt::ImportItem, ModulePath, Span, StringNode},
+    ast::{decl::FnDecl, stmt::ImportItem, ModulePath, Span, StringNode, SymbolId},
     mir::{
         builders::{
             Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InModule,
         },
         errors::{SemanticError, SemanticErrorKind},
-        types::checked_declaration::CheckedDeclaration,
+        types::checked_declaration::{CheckedDeclaration, GenericDeclaration},
     },
 };
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -101,23 +102,40 @@ impl<'a> Builder<'a, InModule> {
                             },
                         };
 
-                        if let Some(decl_id) =
+                        if let Some(symbol_id) =
                             target_module.root_scope.lookup(imported_ident.name)
                         {
-                            let is_exported = match self
-                                .program
-                                .declarations
-                                .get(&decl_id)
-                            {
-                                Some(CheckedDeclaration::Function(f)) => f.is_exported,
-                                Some(CheckedDeclaration::TypeAlias(t)) => t.is_exported,
-                                _ => false,
+                            let is_exported = match symbol_id {
+                                SymbolId::Concrete(id) => {
+                                    match self.program.declarations.get(&id) {
+                                        Some(CheckedDeclaration::Function(f)) => {
+                                            f.is_exported
+                                        }
+                                        Some(CheckedDeclaration::TypeAlias(t)) => {
+                                            t.is_exported
+                                        }
+                                        _ => false,
+                                    }
+                                }
+                                SymbolId::Generic(id) => {
+                                    match self.program.generic_declarations.get(&id) {
+                                        Some(GenericDeclaration::Function {
+                                            decl,
+                                            ..
+                                        }) => decl.is_exported,
+                                        Some(GenericDeclaration::TypeAlias {
+                                            decl,
+                                            ..
+                                        }) => decl.is_exported,
+                                        _ => false,
+                                    }
+                                }
                             };
 
                             if is_exported {
                                 let name_node = alias.unwrap_or(imported_ident);
                                 self.current_scope
-                                    .map_name_to_decl(name_node.name, decl_id);
+                                    .map_name_to_symbol(name_node.name, symbol_id);
                             } else {
                                 self.errors.push(not_exported_err);
                             }
@@ -139,8 +157,9 @@ impl<'a> Builder<'a, InModule> {
     }
 
     fn register_extern_fn(&mut self, f: FnDecl) {
-        let checked_params = self.check_params(&f.params);
-        let checked_return_type = self.check_type_annotation(&f.return_type);
+        let empty_subs = HashMap::new();
+        let checked_params = self.check_params(&f.params, &empty_subs);
+        let checked_return_type = self.check_type_annotation(&f.return_type, &empty_subs);
 
         let function_params = checked_params
             .into_iter()
@@ -164,6 +183,7 @@ impl<'a> Builder<'a, InModule> {
         self.program
             .declarations
             .insert(f.id, CheckedDeclaration::Function(function));
-        self.current_scope.map_name_to_decl(f.identifier.name, f.id);
+        self.current_scope
+            .map_name_to_symbol(f.identifier.name, SymbolId::Concrete(f.id));
     }
 }

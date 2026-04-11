@@ -24,6 +24,10 @@ pub enum TypeAnnotationKind {
     USize(Option<usize>),
     String(Option<StringId>),
     Identifier(IdentifierNode),
+    GenericApply {
+        left: Box<TypeAnnotation>,
+        args: Vec<TypeAnnotation>,
+    },
     Struct(Vec<Param>),
     Union(Vec<TypeAnnotation>),
     List(Box<TypeAnnotation>),

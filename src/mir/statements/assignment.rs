@@ -1,5 +1,6 @@
 use crate::{
     ast::expr::Expr,
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock},
         types::checked_type::SpannedType,
@@ -7,8 +8,13 @@ use crate::{
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_assignment_stmt(&mut self, target: Expr, value: Expr) {
-        let target_place = match self.resolve_place(target) {
+    pub fn build_assignment_stmt(
+        &mut self,
+        target: Expr,
+        value: Expr,
+        substitutions: &GenericSubstitutions,
+    ) {
+        let target_place = match self.resolve_place(target, substitutions) {
             Ok(p) => p,
             Err(e) => {
                 self.errors.push(e);
@@ -24,6 +30,7 @@ impl<'a> Builder<'a, InBlock> {
                 id: constraint,
                 span: value_span,
             }),
+            substitutions,
         );
 
         self.write_place(&target_place, value_id);

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     ast::{expr::Expr, IdentifierNode, Span},
-    compile::interner::StringId,
+    compile::interner::{GenericSubstitutions, StringId},
     mir::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -22,6 +22,7 @@ impl<'a> Builder<'a, InBlock> {
         fields: Vec<(IdentifierNode, Expr)>,
         expected_type: Option<&SpannedType>,
         by_value: bool,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let mut seen_names: HashSet<StringId> = HashSet::new();
         let mut evaluated_fields = Vec::with_capacity(fields.len());
@@ -55,7 +56,8 @@ impl<'a> Builder<'a, InBlock> {
                 }
             });
 
-            let val_id = self.build_expr(field_expr, expected_field_type.as_ref());
+            let val_id =
+                self.build_expr(field_expr, expected_field_type.as_ref(), substitutions);
             let val_ty = self.get_value_type(val_id);
 
             evaluated_fields.push((field_name.clone(), val_id));

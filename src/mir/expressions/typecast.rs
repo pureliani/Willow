@@ -1,5 +1,6 @@
 use crate::{
     ast::{expr::Expr, type_annotation::TypeAnnotation},
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -13,12 +14,13 @@ impl<'a> Builder<'a, InBlock> {
         left: Expr,
         target: TypeAnnotation,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let source_span = left.span.clone();
-        let source = self.build_expr(left, None);
+        let source = self.build_expr(left, None, substitutions);
         let source_type = self.get_value_type(source);
 
-        let target_type = self.check_type_annotation(&target);
+        let target_type = self.check_type_annotation(&target, substitutions);
 
         let adjusted_val =
             match self.compute_type_adjustment(source_type, target_type.id, true) {

@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::{
     ast::{
         expr::{Expr, ExprKind},
-        DeclarationId, IdentifierNode,
+        DeclarationId, IdentifierNode, SymbolId,
     },
-    compile::interner::{StringId, TypeId},
+    compile::interner::{GenericSubstitutions, StringId, TypeId},
     mir::{
         builders::{BasicBlockId, Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -78,12 +78,16 @@ impl Place {
 }
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn resolve_place(&mut self, expr: Expr) -> Result<Place, SemanticError> {
+    pub fn resolve_place(
+        &mut self,
+        expr: Expr,
+        substitutions: &GenericSubstitutions,
+    ) -> Result<Place, SemanticError> {
         let span = expr.span.clone();
 
         match expr.kind {
             ExprKind::Identifier(ident) => match self.current_scope.lookup(ident.name) {
-                Some(decl_id) => {
+                Some(SymbolId::Concrete(decl_id)) => {
                     let decl = self.program.declarations.get(&decl_id).unwrap();
                     match decl {
                         CheckedDeclaration::Var(_) => Ok(Place::Var(decl_id)),
@@ -93,13 +97,17 @@ impl<'a> Builder<'a, InBlock> {
                         }),
                     }
                 }
+                Some(SymbolId::Generic(_)) => Err(SemanticError {
+                    kind: SemanticErrorKind::InvalidLValue,
+                    span,
+                }),
                 None => Err(SemanticError {
                     kind: SemanticErrorKind::UndeclaredIdentifier(ident),
                     span,
                 }),
             },
             ExprKind::Access { left, field } => {
-                let base_place = self.resolve_place(*left)?;
+                let base_place = self.resolve_place(*left, substitutions)?;
                 let base_ty = self.type_of_place(&base_place);
 
                 let derefed_place = if self.types.is_pointer(base_ty) {
@@ -114,7 +122,7 @@ impl<'a> Builder<'a, InBlock> {
                 Ok(Place::Field(Box::new(derefed_place), field.name))
             }
             _ => {
-                let val_id = self.build_expr(expr, None);
+                let val_id = self.build_expr(expr, None, substitutions);
                 Ok(Place::Temporary(val_id))
             }
         }

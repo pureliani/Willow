@@ -1,5 +1,6 @@
 use crate::{
     ast::{expr::BlockContents, Span},
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock, ValueId},
         types::checked_type::SpannedType,
@@ -12,7 +13,7 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         codeblock: BlockContents,
         expected_type: Option<&SpannedType>,
-        is_unsafe: bool,
+        substitutions: &GenericSubstitutions,
     ) -> (ValueId, Span) {
         let mut final_expr_span = Span {
             start: codeblock.span.end,
@@ -20,18 +21,14 @@ impl<'a> Builder<'a, InBlock> {
             path: codeblock.span.path.clone(),
         };
 
-        let scope_kind = if is_unsafe {
-            ScopeKind::UnsafeBlock
-        } else {
-            ScopeKind::CodeBlock
-        };
+        self.current_scope = self
+            .current_scope
+            .enter(ScopeKind::CodeBlock, codeblock.span.start);
 
-        self.current_scope = self.current_scope.enter(scope_kind, codeblock.span.start);
-
-        self.build_statements(codeblock.statements);
+        self.build_statements(codeblock.statements, substitutions);
         let result_id = if let Some(final_expr) = codeblock.final_expr {
             final_expr_span = final_expr.span.clone();
-            self.build_expr(*final_expr, expected_type)
+            self.build_expr(*final_expr, expected_type, substitutions)
         } else {
             self.emit_void()
         };

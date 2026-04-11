@@ -4,9 +4,9 @@ use crate::{
     ast::{
         expr::{Expr, ExprKind},
         type_annotation::TypeAnnotation,
-        Span,
+        Span, SymbolId,
     },
-    compile::interner::TypeId,
+    compile::interner::{GenericSubstitutions, TypeId},
     mir::{
         builders::{Builder, ConditionFact, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -52,8 +52,10 @@ impl<'a> Builder<'a, InBlock> {
     pub fn resolve_narrow_target(&self, expr: &Expr) -> Option<Place> {
         match &expr.kind {
             ExprKind::Identifier(ident) => {
-                let decl_id = self.current_scope.lookup(ident.name)?;
-                Some(Place::Var(decl_id))
+                match self.current_scope.lookup(ident.name)? {
+                    SymbolId::Concrete(decl_id) => Some(Place::Var(decl_id)),
+                    SymbolId::Generic(_) => None,
+                }
             }
             ExprKind::Access { left, field } => {
                 let base_place = self.resolve_narrow_target(left)?;
@@ -76,12 +78,13 @@ impl<'a> Builder<'a, InBlock> {
         left: Expr,
         ty: TypeAnnotation,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let span = left.span.clone();
 
         let place_opt = self.resolve_narrow_target(&left);
 
-        let current_val = self.build_expr(left, None);
+        let current_val = self.build_expr(left, None, substitutions);
         let current_ty = self.get_value_type(current_val);
 
         let source_variants = match self.types.get_union_variants(current_ty) {
@@ -94,7 +97,7 @@ impl<'a> Builder<'a, InBlock> {
             }
         };
 
-        let target_type = self.check_type_annotation(&ty);
+        let target_type = self.check_type_annotation(&ty, substitutions);
 
         if self.types.get_union_variants(target_type.id).is_some() {
             return self.report_error_and_get_poison(SemanticError {

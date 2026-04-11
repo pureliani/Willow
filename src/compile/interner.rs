@@ -13,6 +13,8 @@ use crate::{
     tokenize::{NumberKind, TokenKind},
 };
 
+pub type GenericSubstitutions = HashMap<StringId, TypeId>;
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StringId(pub usize);
 

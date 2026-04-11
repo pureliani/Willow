@@ -5,6 +5,7 @@ pub mod bool;
 pub mod codeblock;
 pub mod r#fn;
 pub mod fn_call;
+pub mod generic_apply;
 pub mod identifier;
 pub mod r#if;
 pub mod is_type;
@@ -24,6 +25,7 @@ use crate::{
         expr::{Expr, ExprKind},
         Span,
     },
+    compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -67,49 +69,98 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         expr: Expr,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let span = expr.span.clone();
         let result = match expr.kind {
-            ExprKind::Not { right } => self.build_not_expr(*right, expected_type),
-            ExprKind::Neg { right } => self.build_neg_expr(*right, expected_type),
-            ExprKind::Add { left, right } => {
-                self.build_binary_op(*left, *right, Self::add, expected_type)
+            ExprKind::Not { right } => {
+                self.build_not_expr(*right, expected_type, substitutions)
             }
-            ExprKind::Subtract { left, right } => {
-                self.build_binary_op(*left, *right, Self::sub, expected_type)
+            ExprKind::Neg { right } => {
+                self.build_neg_expr(*right, expected_type, substitutions)
             }
-            ExprKind::Multiply { left, right } => {
-                self.build_binary_op(*left, *right, Self::mul, expected_type)
-            }
-            ExprKind::Divide { left, right } => {
-                self.build_binary_op(*left, *right, Self::div, expected_type)
-            }
-            ExprKind::Modulo { left, right } => {
-                self.build_binary_op(*left, *right, Self::rem, expected_type)
-            }
-            ExprKind::LessThan { left, right } => {
-                self.build_binary_op(*left, *right, Self::lt, expected_type)
-            }
-            ExprKind::LessThanOrEqual { left, right } => {
-                self.build_binary_op(*left, *right, Self::lte, expected_type)
-            }
-            ExprKind::GreaterThan { left, right } => {
-                self.build_binary_op(*left, *right, Self::gt, expected_type)
-            }
-            ExprKind::GreaterThanOrEqual { left, right } => {
-                self.build_binary_op(*left, *right, Self::gte, expected_type)
-            }
-            ExprKind::Equal { left, right } => {
-                self.build_binary_op(*left, *right, Self::eq, expected_type)
-            }
-            ExprKind::NotEqual { left, right } => {
-                self.build_binary_op(*left, *right, Self::neq, expected_type)
-            }
+            ExprKind::Add { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::add,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::Subtract { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::sub,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::Multiply { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::mul,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::Divide { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::div,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::Modulo { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::rem,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::LessThan { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::lt,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::LessThanOrEqual { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::lte,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::GreaterThan { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::gt,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::GreaterThanOrEqual { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::gte,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::Equal { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::eq,
+                expected_type,
+                substitutions,
+            ),
+            ExprKind::NotEqual { left, right } => self.build_binary_op(
+                *left,
+                *right,
+                Self::neq,
+                expected_type,
+                substitutions,
+            ),
             ExprKind::And { left, right } => {
-                self.build_and_expr(*left, *right, expected_type)
+                self.build_and_expr(*left, *right, expected_type, substitutions)
             }
             ExprKind::Or { left, right } => {
-                self.build_or_expr(*left, *right, expected_type)
+                self.build_or_expr(*left, *right, expected_type, substitutions)
             }
             ExprKind::BoolLiteral(value) => {
                 self.build_bool_expr(span, value, expected_type)
@@ -120,45 +171,62 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::String(string_node) => {
                 self.build_string_literal(string_node, expected_type)
             }
-            ExprKind::Struct(fields) => {
-                self.build_struct_init_expr(span, fields, expected_type, false)
-            }
+            ExprKind::Struct(fields) => self.build_struct_init_expr(
+                span,
+                fields,
+                expected_type,
+                false,
+                substitutions,
+            ),
             ExprKind::List(items) => {
-                self.build_list_literal_expr(span, items, expected_type)
+                self.build_list_literal_expr(span, items, expected_type, substitutions)
             }
             ExprKind::Access { left, field } => {
-                self.build_access_expr(*left, field, expected_type)
+                self.build_access_expr(*left, field, expected_type, substitutions)
             }
             ExprKind::StaticAccess { left, field } => {
-                self.build_static_access_expr(*left, field, expected_type)
+                self.build_static_access_expr(*left, field, expected_type, substitutions)
             }
             ExprKind::If {
                 branches,
                 else_branch,
-            } => {
-                self.build_if(branches, else_branch, IfContext::Expression, expected_type)
-            }
+            } => self.build_if(
+                branches,
+                else_branch,
+                IfContext::Expression,
+                expected_type,
+                substitutions,
+            ),
             ExprKind::CodeBlock(block_contents) => {
-                self.build_codeblock_expr(block_contents, expected_type, false)
+                self.build_codeblock_expr(block_contents, expected_type, substitutions)
                     .0
             }
-            ExprKind::Fn(fn_decl) => self.build_fn_expr(*fn_decl, expected_type),
+            ExprKind::Fn(fn_decl) => {
+                self.build_fn_expr(*fn_decl, expected_type, substitutions)
+            }
             ExprKind::FnCall { left, args } => {
-                self.build_fn_call_expr(*left, args, span, expected_type)
+                self.build_fn_call_expr(*left, args, span, expected_type, substitutions)
             }
             ExprKind::Identifier(identifier_node) => {
-                self.build_identifier_expr(identifier_node, expected_type)
+                self.build_identifier_expr(identifier_node, expected_type, substitutions)
             }
             ExprKind::TypeCast { left, target } => {
-                self.build_typecast_expr(*left, target, expected_type)
+                self.build_typecast_expr(*left, target, expected_type, substitutions)
             }
             ExprKind::IsType { left, ty } => {
-                self.build_is_type_expr(*left, ty, expected_type)
+                self.build_is_type_expr(*left, ty, expected_type, substitutions)
             }
             ExprKind::Null => self.build_null_expr(span, expected_type),
             ExprKind::TemplateString(parts) => {
                 self.build_template_expr(parts, span, expected_type)
             }
+            ExprKind::GenericApply { left, type_args } => self.build_generic_apply_expr(
+                *left,
+                type_args,
+                span,
+                expected_type,
+                substitutions,
+            ),
         };
 
         self.check_expected(result, expr.span, expected_type)

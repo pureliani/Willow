@@ -4,13 +4,15 @@ use std::{
 };
 
 use crate::{
-    ast::{DeclarationId, IdentifierNode, ModulePath},
+    ast::{DeclarationId, GenericDeclarationId, IdentifierNode, ModulePath},
     compile::interner::{TypeId, TypeInterner},
     mir::{
         errors::SemanticError,
         instructions::{Instruction, Terminator},
         types::{
-            checked_declaration::{CheckedDeclaration, FunctionEffects},
+            checked_declaration::{
+                CheckedDeclaration, FunctionEffects, GenericDeclaration,
+            },
             checked_type::SpannedType,
         },
         utils::{facts::FactSet, place::Place, scope::Scope},
@@ -47,12 +49,14 @@ pub struct Program {
     pub modules: BTreeMap<ModulePath, Module>,
     pub value_types: BTreeMap<ValueId, TypeId>,
     pub declarations: BTreeMap<DeclarationId, CheckedDeclaration>,
-    pub entry_path: Option<ModulePath>,
+    pub generic_declarations: BTreeMap<GenericDeclarationId, GenericDeclaration>,
 
+    pub entry_path: Option<ModulePath>,
     pub target_ptr_size: usize,
     pub target_ptr_align: usize,
-
     pub foreign_links: HashSet<PathBuf>,
+
+    pub monomorphizations: BTreeMap<(GenericDeclarationId, Vec<TypeId>), DeclarationId>,
 }
 
 pub struct Module {

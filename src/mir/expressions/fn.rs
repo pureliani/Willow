@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::{
     ast::{decl::FnDecl, Span},
+    compile::interner::GenericSubstitutions,
     globals::{next_block_id, next_declaration_id, STRING_INTERNER},
     mir::{
         builders::{
@@ -19,7 +20,11 @@ use crate::{
 };
 
 impl<'a> Builder<'a, InModule> {
-    pub fn build_fn_body(&mut self, fn_decl: FnDecl) -> Result<(), SemanticError> {
+    pub fn build_fn_body(
+        &mut self,
+        fn_decl: FnDecl,
+        substitutions: &GenericSubstitutions,
+    ) -> Result<(), SemanticError> {
         if !self.current_scope.is_file_scope() {
             return Err(SemanticError {
                 kind: SemanticErrorKind::ClosuresNotSupportedYet,
@@ -145,7 +150,8 @@ impl<'a> Builder<'a, InModule> {
         let return_type = fn_builder.get_fn().return_type.clone();
 
         let (final_value, _) =
-            fn_builder.build_codeblock_expr(body, Some(&return_type), false);
+            fn_builder.build_codeblock_expr(body, Some(&return_type), substitutions);
+
         if fn_builder.bb().terminator.is_none() {
             fn_builder.emit_return(final_value);
         }
@@ -162,11 +168,12 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         fn_decl: FnDecl,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let id = fn_decl.id;
         let span = fn_decl.identifier.span.clone();
 
-        match self.as_module().build_fn_body(fn_decl) {
+        match self.as_module().build_fn_body(fn_decl, substitutions) {
             Ok(_) => {}
             Err(e) => self.errors.push(e),
         };

@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    ast::{decl::VarDecl, DeclarationId, IdentifierNode, Span},
-    compile::interner::TypeId,
+    ast::{decl::VarDecl, DeclarationId, IdentifierNode, Span, SymbolId},
+    compile::interner::{GenericSubstitutions, TypeId},
     mir::{
         builders::{Builder, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -57,12 +57,16 @@ impl<'a> Builder<'a, InBlock> {
             .insert(decl_id, CheckedDeclaration::Var(checked_var_decl));
 
         self.current_scope
-            .map_name_to_decl(identifier.name, decl_id);
+            .map_name_to_symbol(identifier.name, SymbolId::Concrete(decl_id));
 
         stack_ptr
     }
 
-    pub fn build_var_decl(&mut self, var_decl: VarDecl) {
+    pub fn build_var_decl(
+        &mut self,
+        var_decl: VarDecl,
+        substitutions: &GenericSubstitutions,
+    ) {
         if self.current_scope.is_file_scope() {
             self.errors.push(SemanticError {
                 kind: SemanticErrorKind::CannotDeclareGlobalVariable,
@@ -76,9 +80,10 @@ impl<'a> Builder<'a, InBlock> {
         let constraint = var_decl
             .constraint
             .as_ref()
-            .map(|c| self.check_type_annotation(c));
+            .map(|c| self.check_type_annotation(c, substitutions));
 
-        let mut value = self.build_expr(var_decl.value, constraint.as_ref());
+        let mut value =
+            self.build_expr(var_decl.value, constraint.as_ref(), substitutions);
         let mut value_type = self.get_value_type(value);
 
         if constraint.is_none() {

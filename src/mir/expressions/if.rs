@@ -3,7 +3,7 @@ use crate::{
         expr::{BlockContents, Expr},
         Span,
     },
-    compile::interner::TypeId,
+    compile::interner::{GenericSubstitutions, TypeId},
     mir::{
         builders::{BasicBlockId, Builder, ExpectBody, InBlock, ValueId},
         errors::{SemanticError, SemanticErrorKind},
@@ -27,6 +27,7 @@ impl<'a> Builder<'a, InBlock> {
         else_branch: Option<BlockContents>,
         context: IfContext,
         expected_type: Option<&SpannedType>,
+        substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let expr_span = branches.first().unwrap().0.span.clone();
 
@@ -50,7 +51,11 @@ impl<'a> Builder<'a, InBlock> {
                 span: condition_span.clone(),
             });
 
-            let cond_id = self.build_expr(*condition, expected_condition_type.as_ref());
+            let cond_id = self.build_expr(
+                *condition,
+                expected_condition_type.as_ref(),
+                substitutions,
+            );
             let cond_ty = self.get_value_type(cond_id);
 
             if cond_ty == self.types.unknown() {
@@ -78,7 +83,7 @@ impl<'a> Builder<'a, InBlock> {
             }
 
             let (then_val, then_val_span) =
-                self.build_codeblock_expr(body, expected_type, false);
+                self.build_codeblock_expr(body, expected_type, substitutions);
 
             if self.bb().terminator.is_none() {
                 branch_results.push((self.context.block_id, then_val, then_val_span));
@@ -105,7 +110,7 @@ impl<'a> Builder<'a, InBlock> {
 
         if let Some(else_body) = else_branch {
             let (else_val, else_val_span) =
-                self.build_codeblock_expr(else_body, expected_type, false);
+                self.build_codeblock_expr(else_body, expected_type, substitutions);
 
             if self.bb().terminator.is_none() {
                 branch_results.push((self.context.block_id, else_val, else_val_span));

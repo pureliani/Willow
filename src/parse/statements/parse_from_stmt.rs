@@ -1,6 +1,7 @@
 use crate::{
     ast::{
         decl::FnDecl,
+        expr::BlockContents,
         stmt::{ImportItem, Stmt, StmtKind},
     },
     globals::next_declaration_id,
@@ -21,11 +22,12 @@ impl Parser {
                 if p.match_token(0, TokenKind::Keyword(KeywordKind::Fn)) {
                     let fn_start_offset = p.offset;
 
-                    let (identifier, params, return_type) = p.parse_fn_signature()?;
+                    let (identifier, generic_params, params, return_type) =
+                        p.parse_fn_signature()?;
 
                     let id = next_declaration_id();
 
-                    let body = crate::ast::expr::BlockContents {
+                    let body = BlockContents {
                         statements: vec![],
                         final_expr: None,
                         span: p.get_span(fn_start_offset, p.offset - 1)?,
@@ -36,6 +38,7 @@ impl Parser {
                         documentation: None,
                         identifier,
                         params,
+                        generic_params,
                         return_type,
                         body,
                         is_exported: false,

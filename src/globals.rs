@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::LazyLock;
 
-use crate::ast::DeclarationId;
+use crate::ast::{DeclarationId, GenericDeclarationId};
 use crate::compile::interner::{StringId, StringInterner};
 use crate::mir::builders::{BasicBlockId, ValueId};
 
@@ -17,6 +17,8 @@ pub static VALUE_COUNTER: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::
 pub static BLOCK_COUNTER: LazyLock<AtomicUsize> = LazyLock::new(|| AtomicUsize::new(0));
 
 pub static DECLARATION_COUNTER: LazyLock<AtomicUsize> =
+    LazyLock::new(|| AtomicUsize::new(0));
+pub static GENERIC_DECLARATION_COUNTER: LazyLock<AtomicUsize> =
     LazyLock::new(|| AtomicUsize::new(0));
 
 pub static STRING_INTERNER: LazyLock<StringInterner> =
@@ -41,6 +43,10 @@ pub fn next_block_id() -> BasicBlockId {
 
 pub fn next_declaration_id() -> DeclarationId {
     DeclarationId(DECLARATION_COUNTER.fetch_add(1, Ordering::SeqCst))
+}
+
+pub fn next_generic_declaration_id() -> GenericDeclarationId {
+    GenericDeclarationId(GENERIC_DECLARATION_COUNTER.fetch_add(1, Ordering::SeqCst))
 }
 
 pub fn reset_globals() {

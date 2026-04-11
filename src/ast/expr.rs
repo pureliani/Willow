@@ -99,6 +99,10 @@ pub enum ExprKind {
     String(StringNode),
     TemplateString(Vec<Expr>),
     Identifier(IdentifierNode),
+    GenericApply {
+        left: Box<Expr>,
+        type_args: Vec<TypeAnnotation>,
+    },
     Fn(Box<FnDecl>),
     If {
         branches: Vec<(Box<Expr>, BlockContents)>,
