@@ -25,7 +25,16 @@ impl<'a> Builder<'a, InModule> {
         fn_decl: FnDecl,
         substitutions: &GenericSubstitutions,
     ) -> Result<(), SemanticError> {
-        if !self.current_scope.is_file_scope() {
+        let is_valid_scope = match self.current_scope.kind() {
+            ScopeKind::File => true,
+            ScopeKind::GenericParams => self
+                .current_scope
+                .parent()
+                .is_some_and(|p| p.is_file_scope()),
+            _ => false,
+        };
+
+        if !is_valid_scope {
             return Err(SemanticError {
                 kind: SemanticErrorKind::ClosuresNotSupportedYet,
                 span: fn_decl.identifier.span.clone(),
@@ -172,6 +181,13 @@ impl<'a> Builder<'a, InBlock> {
     ) -> ValueId {
         let id = fn_decl.id;
         let span = fn_decl.identifier.span.clone();
+
+        if !fn_decl.generic_params.is_empty() {
+            return self.report_error_and_get_poison(SemanticError {
+                span: span.clone(),
+                kind: SemanticErrorKind::GenericClosuresNotSupported,
+            });
+        }
 
         match self.as_module().build_fn_body(fn_decl, substitutions) {
             Ok(_) => {}

@@ -66,10 +66,13 @@ impl<'a> Builder<'a, InGlobal> {
                     }
                     StmtKind::Expression(expr) => {
                         if let ExprKind::Fn(f) = expr.kind {
-                            if let Err(e) = module_builder.build_fn_body(*f, &empty_subs)
-                            {
-                                module_builder.errors.push(e);
-                            };
+                            if f.generic_params.is_empty() {
+                                if let Err(e) =
+                                    module_builder.build_fn_body(*f, &empty_subs)
+                                {
+                                    module_builder.errors.push(e);
+                                };
+                            }
                         }
                     }
                     _ => {}

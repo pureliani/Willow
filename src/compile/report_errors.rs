@@ -254,6 +254,11 @@ impl Compiler {
                         .with_labels(vec![Label::primary(file_id, range.clone())]);
 
                     match &e.kind {
+                           SemanticErrorKind::GenericClosuresNotSupported => {
+                            diag.with_message("Generic closures not supported")
+                                .with_labels(vec![Label::primary(file_id, range)
+                                    .with_message("Generic closures are not supported yet")])
+                        }
                         SemanticErrorKind::CannotInferGenericArgument(ident) => {
                             let name = STRING_INTERNER.resolve(ident.name);
                             diag.with_message("Cannot infer generic argument")

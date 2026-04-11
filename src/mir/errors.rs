@@ -9,6 +9,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum SemanticErrorKind {
     UnsupportedUnionNarrowing,
+    GenericClosuresNotSupported,
     CannotInferGenericArgument(IdentifierNode),
     ConflictingGenericBinding {
         param_name: IdentifierNode,
@@ -189,6 +190,9 @@ impl SemanticErrorKind {
             SemanticErrorKind::CannotInferGenericArgument { .. } => {
                 SemanticErrorSeverity::Error
             }
+            SemanticErrorKind::GenericClosuresNotSupported => {
+                SemanticErrorSeverity::Error
+            }
         }
     }
 
@@ -243,6 +247,7 @@ impl SemanticErrorKind {
             SemanticErrorKind::ConflictingGenericBinding { .. } => 49,
             SemanticErrorKind::AmbiguousGenericInference => 50,
             SemanticErrorKind::CannotInferGenericArgument { .. } => 51,
+            SemanticErrorKind::GenericClosuresNotSupported => 52,
         }
     }
 }
