@@ -303,10 +303,10 @@ impl Compiler {
                                 )),
                             ])
                         }
-                        SemanticErrorKind::ExpectedANumericOperand => diag
+                        SemanticErrorKind::ExpectedANumericOperand { received } => diag
                             .with_message("Expected numeric operand")
                             .with_labels(vec![Label::primary(file_id, range)
-                                .with_message("This must be a numeric type")]),
+                                .with_message(format!("Expected a numeric operand, instead received `{}`", self.types.to_string(*received)))]),
                         SemanticErrorKind::ExpectedASignedNumericOperand => diag
                             .with_message("Expected signed numeric operand")
                             .with_labels(vec![Label::primary(file_id, range)

@@ -33,7 +33,9 @@ pub enum SemanticErrorKind {
     UnknownStructFieldInitializer(IdentifierNode),
     MissingStructFieldInitializers(HashSet<StringId>),
     CannotCall(TypeId),
-    ExpectedANumericOperand,
+    ExpectedANumericOperand {
+        received: TypeId,
+    },
     ExpectedASignedNumericOperand,
     MixedSignedAndUnsigned,
     MixedFloatAndInteger,
@@ -101,7 +103,9 @@ pub enum SemanticErrorSeverity {
 impl SemanticErrorKind {
     pub fn severity(&self) -> SemanticErrorSeverity {
         match self {
-            SemanticErrorKind::ExpectedANumericOperand => SemanticErrorSeverity::Error,
+            SemanticErrorKind::ExpectedANumericOperand { .. } => {
+                SemanticErrorSeverity::Error
+            }
             SemanticErrorKind::MixedSignedAndUnsigned => SemanticErrorSeverity::Error,
             SemanticErrorKind::MixedFloatAndInteger => SemanticErrorSeverity::Error,
             SemanticErrorKind::CannotCompareType { .. } => SemanticErrorSeverity::Error,
@@ -198,7 +202,7 @@ impl SemanticErrorKind {
 
     pub fn code(&self) -> usize {
         match self {
-            SemanticErrorKind::ExpectedANumericOperand => 1,
+            SemanticErrorKind::ExpectedANumericOperand { .. } => 1,
             SemanticErrorKind::MixedSignedAndUnsigned => 2,
             SemanticErrorKind::MixedFloatAndInteger => 3,
             SemanticErrorKind::CannotCompareType { .. } => 4,

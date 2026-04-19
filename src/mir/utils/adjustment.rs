@@ -265,7 +265,9 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
             effective_left
         } else {
             return Err(SemanticError {
-                kind: SemanticErrorKind::ExpectedANumericOperand,
+                kind: SemanticErrorKind::ExpectedANumericOperand {
+                    received: effective_left,
+                },
                 span: left_span,
             });
         };
@@ -276,7 +278,9 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
             effective_right
         } else {
             return Err(SemanticError {
-                kind: SemanticErrorKind::ExpectedANumericOperand,
+                kind: SemanticErrorKind::ExpectedANumericOperand {
+                    received: effective_right,
+                },
                 span: right_span,
             });
         };

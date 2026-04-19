@@ -196,7 +196,11 @@ impl<'a> Builder<'a, InBlock> {
 
             if narrowed.variants.len() == 1 {
                 let target_ty = *narrowed.variants.iter().next().unwrap();
-                println!("Narrowing from {:?} to {:?}", current_ty, target_ty);
+                println!(
+                    "Narrowing from {:?} to {:?}",
+                    self.types.to_string(current_ty),
+                    self.types.to_string(target_ty)
+                );
                 if current_ty != target_ty {
                     return self.emit_unwrap_from_union(val, target_ty);
                 }
