@@ -67,9 +67,11 @@ impl<'a> Builder<'a, InBlock> {
              passed by value, but got a pointer"
         );
 
-        let variants = self.types.get_union_variants(union_ty).expect(
-            "INTERNAL COMPILER ERROR: emit_unwrap_from_union - union_val is not a union",
-        );
+        let unwrapped_union_ty = self.types.unwrap_generic_bound(union_ty);
+        let variants = self
+            .types
+            .get_union_variants(unwrapped_union_ty)
+            .expect("INTERNAL COMPILER ERROR: emit_unwrap_from_union - union_val is not a union");
 
         assert!(
             variants.contains(&variant_type),
@@ -110,9 +112,10 @@ impl<'a> Builder<'a, InBlock> {
              value, but got a pointer"
         );
 
+        let unwrapped_union_ty = self.types.unwrap_generic_bound(union_ty);
         let variants = self
             .types
-            .get_union_variants(union_ty)
+            .get_union_variants(unwrapped_union_ty)
             .expect("INTERNAL COMPILER ERROR: emit_test_variant called with non-union");
 
         assert!(

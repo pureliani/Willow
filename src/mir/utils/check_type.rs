@@ -24,6 +24,9 @@ use crate::{
 
 impl<'a, C: BuilderContext> Builder<'a, C> {
     pub fn satisfies_extends_bound(&self, source: TypeId, target: TypeId) -> bool {
+        let source = self.types.unwrap_generic_bound(source);
+        let target = self.types.unwrap_generic_bound(target);
+
         if source == target {
             return true;
         }

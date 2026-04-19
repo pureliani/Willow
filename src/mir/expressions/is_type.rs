@@ -93,7 +93,7 @@ impl<'a> Builder<'a, InBlock> {
         let source_variants = match self.types.get_union_variants(actual_current_ty) {
             Some(v) => v,
             None => {
-                let is_match = current_ty == target_type.id;
+                let is_match = self.satisfies_extends_bound(current_ty, target_type.id);
                 let bool_val = self.emit_bool(is_match);
                 return self.check_expected(bool_val, span, expected_type);
             }
