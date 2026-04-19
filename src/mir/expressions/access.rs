@@ -1,5 +1,8 @@
 use crate::{
-    ast::{expr::Expr, IdentifierNode},
+    ast::{
+        expr::{Expr, ExprKind},
+        IdentifierNode,
+    },
     compile::interner::GenericSubstitutions,
     mir::{
         builders::{Builder, InBlock, ValueId},
@@ -16,12 +19,21 @@ impl<'a> Builder<'a, InBlock> {
         substitutions: &GenericSubstitutions,
     ) -> ValueId {
         let field_span = field.span.clone();
-        let base_ptr = self.build_expr(left, None, substitutions);
-        let field_ptr = match self.try_get_field_ptr(base_ptr, &field, false) {
-            Ok(ptr) => ptr,
+
+        let access_expr = Expr {
+            kind: ExprKind::Access {
+                left: Box::new(left),
+                field: field.clone(),
+            },
+            span: field_span.clone(),
+        };
+
+        let place = match self.resolve_place(access_expr, substitutions) {
+            Ok(p) => p,
             Err(e) => return self.report_error_and_get_poison(e),
         };
-        let field_val = self.emit_load(field_ptr);
+
+        let field_val = self.read_place(&place);
         self.check_expected(field_val, field_span, expected_type)
     }
 }
