@@ -319,6 +319,7 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
         substitutions: &HashMap<StringId, TypeId>,
     ) -> SpannedType {
         let id = match &annotation.kind {
+            TypeAnnotationKind::Never => self.types.never(),
             TypeAnnotationKind::Void => self.types.void(),
             TypeAnnotationKind::Null => self.types.null(),
             TypeAnnotationKind::Bool(lit) => self.types.bool(*lit),

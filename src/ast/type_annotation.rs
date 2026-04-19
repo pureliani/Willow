@@ -7,6 +7,7 @@ use super::decl::Param;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeAnnotationKind {
+    Never,
     Null,
     Void,
     Bool(Option<bool>),

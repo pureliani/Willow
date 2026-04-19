@@ -45,6 +45,16 @@ impl Parser {
         let token = self.current().ok_or(self.unexpected_end_of_input())?;
 
         let mut lhs = match token.kind {
+            TokenKind::Keyword(KeywordKind::Never) => {
+                let start_offset = self.offset;
+
+                self.consume_keyword(KeywordKind::Never)?;
+                let span = self.get_span(start_offset, self.offset - 1)?;
+                TypeAnnotation {
+                    kind: TypeAnnotationKind::Never,
+                    span,
+                }
+            }
             TokenKind::Keyword(KeywordKind::Void) => {
                 let start_offset = self.offset;
 
