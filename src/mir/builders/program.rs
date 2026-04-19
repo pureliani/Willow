@@ -55,9 +55,13 @@ impl<'a, C: BuilderContext> Builder<'a, C> {
 
         f(&mut dummy_builder);
 
-        for id in temp_own_declarations {
-            self.program.declarations.remove(&id);
+        for id in &temp_own_declarations {
+            self.program.declarations.remove(id);
         }
+
+        self.program
+            .monomorphizations
+            .retain(|_, v| !temp_own_declarations.contains(v));
 
         temp_errors
     }
