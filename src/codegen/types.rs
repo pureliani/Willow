@@ -1,22 +1,12 @@
-use inkwell::types::{AnyType, AnyTypeEnum, BasicTypeEnum};
+use inkwell::types::BasicTypeEnum;
 use inkwell::AddressSpace;
 
 use crate::codegen::CodeGenerator;
 use crate::compile::interner::TypeId;
-use crate::mir::types::checked_type::{LiteralType, StructKind, Type};
+use crate::mir::types::checked_type::{StructKind, Type};
 use crate::mir::utils::layout::get_layout_of;
 
 impl<'ctx, 'a> CodeGenerator<'ctx, 'a> {
-    pub fn get_any_type(&self, ty_id: TypeId) -> AnyTypeEnum<'ctx> {
-        let ty = self.type_interner.resolve(ty_id);
-        match ty {
-            Type::Literal(LiteralType::Void | LiteralType::Never) => {
-                self.context.void_type().into()
-            }
-            _ => self.get_basic_type(ty_id).as_any_type_enum(),
-        }
-    }
-
     pub fn get_basic_type(&self, ty_id: TypeId) -> BasicTypeEnum<'ctx> {
         let ty = self.type_interner.resolve(ty_id);
 

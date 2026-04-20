@@ -15,21 +15,58 @@ impl<'a> Builder<'a, InBlock> {
     pub fn emit_stack_alloc(&mut self, value_type: TypeId, count: usize) -> ValueId {
         let ptr_ty = self.types.ptr(value_type);
         let dest = self.new_value_id(ptr_ty);
-        self.push_instruction(Instruction::Memory(MemoryInstr::StackAlloc {
-            dest,
-            count,
-        }));
+
+        let ptr_layout = get_layout_of(
+            &self.types.resolve(ptr_ty),
+            self.types,
+            self.program.target_ptr_size,
+            self.program.target_ptr_align,
+        );
+
+        if ptr_layout.size > 0 {
+            self.push_instruction(Instruction::Memory(MemoryInstr::StackAlloc {
+                dest,
+                count,
+            }));
+        }
+
         dest
     }
 
     pub fn emit_heap_alloc(&mut self, value_type: TypeId, count: ValueId) -> ValueId {
         let ptr_ty = self.types.ptr(value_type);
         let dest = self.new_value_id(ptr_ty);
-        self.push_instruction(Instruction::Memory(MemoryInstr::HeapAlloc {
-            dest,
-            count,
-        }));
+
+        let ptr_layout = get_layout_of(
+            &self.types.resolve(ptr_ty),
+            self.types,
+            self.program.target_ptr_size,
+            self.program.target_ptr_align,
+        );
+
+        if ptr_layout.size > 0 {
+            self.push_instruction(Instruction::Memory(MemoryInstr::HeapAlloc {
+                dest,
+                count,
+            }));
+        }
+
         dest
+    }
+
+    pub fn emit_heap_free(&mut self, ptr: ValueId) {
+        let ptr_ty = self.get_value_type(ptr);
+
+        let ptr_layout = get_layout_of(
+            &self.types.resolve(ptr_ty),
+            self.types,
+            self.program.target_ptr_size,
+            self.program.target_ptr_align,
+        );
+
+        if ptr_layout.size > 0 {
+            self.push_instruction(Instruction::Memory(MemoryInstr::HeapFree { ptr }));
+        }
     }
 
     pub fn emit_load(&mut self, ptr: ValueId) -> ValueId {
@@ -133,7 +170,7 @@ impl<'a> Builder<'a, InBlock> {
             );
 
             if layout.size == 0 {
-                panic!("INTERNAL COMPILER ERROR: Cannot perform pointer offset on a Zero-Sized Type");
+                return base_ptr;
             }
 
             let dest_ty = self.types.ptr(to);
@@ -193,11 +230,20 @@ impl<'a> Builder<'a, InBlock> {
         let field_ptr_ty = self.types.ptr(field_type);
         let dest = self.new_value_id(field_ptr_ty);
 
-        self.push_instruction(Instruction::Memory(MemoryInstr::GetFieldPtr {
-            dest,
-            base_ptr,
-            field_index,
-        }));
+        let ptr_layout = get_layout_of(
+            &self.types.resolve(field_ptr_ty),
+            self.types,
+            self.program.target_ptr_size,
+            self.program.target_ptr_align,
+        );
+
+        if ptr_layout.size > 0 {
+            self.push_instruction(Instruction::Memory(MemoryInstr::GetFieldPtr {
+                dest,
+                base_ptr,
+                field_index,
+            }));
+        }
 
         Ok(dest)
     }

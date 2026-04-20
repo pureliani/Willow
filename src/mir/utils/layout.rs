@@ -35,8 +35,19 @@ pub fn get_layout_of(
         Type::U32 | Type::I32 | Type::F32 => Layout::new(4, 4),
         Type::U64 | Type::I64 | Type::F64 => Layout::new(8, 8),
 
-        Type::USize | Type::ISize | Type::Pointer(_) | Type::IndirectFn(_) => {
+        Type::USize | Type::ISize | Type::IndirectFn(_) => {
             Layout::new(ptr_size, ptr_align)
+        }
+
+        Type::Pointer(inner_id) => {
+            let inner_ty = interner.resolve(*inner_id);
+            let inner_layout = get_layout_of(&inner_ty, interner, ptr_size, ptr_align);
+
+            if inner_layout.size == 0 {
+                Layout::new(0, 1)
+            } else {
+                Layout::new(ptr_size, ptr_align)
+            }
         }
 
         Type::TaglessUnion(variants) => {

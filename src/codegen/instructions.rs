@@ -171,20 +171,8 @@ impl<'ctx, 'a> CodeGenerator<'ctx, 'a> {
                     .unwrap();
             }
             Terminator::Return { value } => {
-                let val_ty = cfg.values[value].ty;
-                let resolved_ty = self.type_interner.resolve(val_ty);
-
-                if matches!(
-                    resolved_ty,
-                    Type::Literal(
-                        LiteralType::Void | LiteralType::Never | LiteralType::Null
-                    )
-                ) {
-                    self.builder.build_return(None).unwrap();
-                } else {
-                    let ret_val = self.get_val(cfg, *value);
-                    self.builder.build_return(Some(&ret_val)).unwrap();
-                }
+                let ret_val = self.get_val(cfg, *value);
+                self.builder.build_return(Some(&ret_val)).unwrap();
             }
             Terminator::Unreachable => {
                 self.builder.build_unreachable().unwrap();
@@ -596,18 +584,13 @@ impl<'ctx, 'a> CodeGenerator<'ctx, 'a> {
             }) => {
                 let func_ptr = self.get_val(cfg, instr.func).into_pointer_value();
 
-                let ret_ty = self.get_any_type(return_type.id);
+                let ret_ty = self.get_basic_type(return_type.id);
                 let mut param_types = Vec::new();
                 for p in params {
                     param_types.push(self.get_basic_type(p.ty.id).into());
                 }
 
-                let fn_type = if ret_ty.is_void_type() {
-                    self.context.void_type().fn_type(&param_types, false)
-                } else {
-                    let basic_ret = self.get_basic_type(return_type.id);
-                    basic_ret.fn_type(&param_types, false)
-                };
+                let fn_type = ret_ty.fn_type(&param_types, false);
 
                 self.builder
                     .build_indirect_call(fn_type, func_ptr, &args, "call")

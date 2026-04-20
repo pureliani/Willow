@@ -12,19 +12,14 @@ impl<'ctx, 'a> CodeGenerator<'ctx, 'a> {
             if let CheckedDeclaration::Function(f) = decl {
                 let name = STRING_INTERNER.resolve(f.identifier.name);
 
-                let ret_ty = self.get_any_type(f.return_type.id);
+                let ret_ty = self.get_basic_type(f.return_type.id);
                 let mut param_types: Vec<BasicMetadataTypeEnum<'ctx>> = Vec::new();
 
                 for param in &f.params {
                     param_types.push(self.get_basic_type(param.ty.id).into());
                 }
 
-                let fn_type = if ret_ty.is_void_type() {
-                    self.context.void_type().fn_type(&param_types, false)
-                } else {
-                    self.get_basic_type(f.return_type.id)
-                        .fn_type(&param_types, false)
-                };
+                let fn_type = ret_ty.fn_type(&param_types, false);
 
                 let is_external = matches!(f.body, FunctionBodyKind::External);
 
