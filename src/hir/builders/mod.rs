@@ -21,7 +21,6 @@ use crate::{
 };
 
 pub mod basic_block;
-pub mod binary;
 pub mod cast;
 pub mod comp;
 pub mod r#const;

@@ -1,20 +1,13 @@
 use crate::{
     ast::expr::{BlockContents, Expr},
-    compile::interner::GenericSubstitutions,
     hir::{
-        builders::{Builder, InBlock},
-        types::checked_type::SpannedType,
+        builders::{Builder, ExpectBody, InBlock},
         utils::scope::ScopeKind,
     },
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_while_stmt(
-        &mut self,
-        condition: Expr,
-        body: BlockContents,
-        substitutions: &GenericSubstitutions,
-    ) {
+    pub fn build_while_stmt(&mut self, condition: Expr, body: BlockContents) {
         let header_block_id = self.as_fn().new_bb();
         let body_block_id = self.as_fn().new_bb();
         let exit_block_id = self.as_fn().new_bb();
@@ -23,32 +16,9 @@ impl<'a> Builder<'a, InBlock> {
         self.use_basic_block(header_block_id);
 
         let condition_span = condition.span.clone();
+        let cond_id = self.build_expr(condition);
 
-        let cond_id = self.build_expr(condition, None, substitutions);
-        let cond_ty = self.get_value_type(cond_id);
-
-        let is_statically_true = cond_ty == self.types.bool(Some(true));
-        let is_statically_false = cond_ty == self.types.bool(Some(false));
-
-        if is_statically_false {
-            self.emit_jmp(exit_block_id);
-            self.seal_block(body_block_id);
-            self.use_basic_block(exit_block_id);
-            self.seal_block(exit_block_id);
-            return;
-        }
-
-        if is_statically_true {
-            self.emit_jmp(body_block_id);
-        } else {
-            let expected = SpannedType {
-                id: self.types.bool(None),
-                span: condition_span.clone(),
-            };
-            let runtime_cond_id =
-                self.check_expected(cond_id, condition_span, Some(&expected));
-            self.emit_cond_jmp(runtime_cond_id, body_block_id, exit_block_id);
-        }
+        self.emit_cond_jmp(cond_id, body_block_id, exit_block_id);
 
         self.seal_block(body_block_id);
         self.use_basic_block(body_block_id);
@@ -61,9 +31,9 @@ impl<'a> Builder<'a, InBlock> {
             body.span.start,
         );
 
-        self.build_statements(body.statements, substitutions);
+        self.build_statements(body.statements);
         if let Some(final_expr) = body.final_expr {
-            self.build_expr(*final_expr, None, substitutions);
+            self.build_expr(*final_expr);
         }
 
         self.current_scope = self
@@ -71,7 +41,13 @@ impl<'a> Builder<'a, InBlock> {
             .exit(body.span.end)
             .expect("INTERNAL COMPILER ERROR: Scope mismatch");
 
-        if self.bb().terminator.is_none() {
+        if self
+            .get_fn()
+            .expect_body()
+            .get_block(self.context.block_id)
+            .terminator
+            .is_none()
+        {
             self.emit_jmp(header_block_id);
         }
 
@@ -79,9 +55,5 @@ impl<'a> Builder<'a, InBlock> {
 
         self.use_basic_block(exit_block_id);
         self.seal_block(exit_block_id);
-
-        if is_statically_true && self.bb().predecessors.is_empty() {
-            self.emit_unreachable();
-        }
     }
 }

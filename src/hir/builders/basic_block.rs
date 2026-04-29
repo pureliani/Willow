@@ -1,22 +1,16 @@
-use crate::hir::{
-    builders::{
-        BasicBlockId, Builder, CheckedFunctionDecl, ExpectBody, InBlock, InFunction,
-        InGlobal, InModule,
+use crate::{
+    ast::Span,
+    hir::{
+        builders::{
+            BasicBlockId, Builder, CheckedFunctionDecl, ExpectBody, InBlock, InFunction,
+            InModule,
+        },
+        instructions::InstrId,
+        types::checked_declaration::CheckedDeclaration,
     },
-    types::checked_declaration::CheckedDeclaration,
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn as_program(&mut self) -> Builder<'_, InGlobal> {
-        Builder {
-            context: InGlobal,
-            program: self.program,
-            errors: self.errors,
-            current_scope: self.current_scope.clone(),
-            own_declarations: self.own_declarations,
-        }
-    }
-
     pub fn as_module(&mut self) -> Builder<'_, InModule> {
         Builder {
             context: InModule {
@@ -38,7 +32,6 @@ impl<'a> Builder<'a, InBlock> {
             program: self.program,
             errors: self.errors,
             current_scope: self.current_scope.clone(),
-
             own_declarations: self.own_declarations,
         }
     }
@@ -59,6 +52,11 @@ impl<'a> Builder<'a, InBlock> {
             CheckedDeclaration::Function(f) => f,
             _ => panic!("INTERNAL COMPILER ERROR: Declaration is not a function"),
         }
+    }
+
+    pub fn get_instr_span(&self, id: InstrId) -> &Span {
+        let cfg = self.get_fn().expect_body();
+        &cfg.get_instr(id).span
     }
 
     pub fn use_basic_block(&mut self, block_id: BasicBlockId) {

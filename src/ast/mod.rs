@@ -88,6 +88,15 @@ impl Span {
     pub fn contains(&self, byte_offset: usize) -> bool {
         byte_offset >= self.start.byte_offset && byte_offset <= self.end.byte_offset
     }
+
+    pub fn merge(&self, other: &Self) -> Self {
+        pretty_assertions::assert_eq!(self.path, other.path);
+        Self {
+            start: self.start,
+            end: other.end,
+            path: self.path.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

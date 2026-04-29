@@ -16,24 +16,37 @@ pub struct BasicBlockId(pub usize);
 pub struct InstrId(pub usize);
 
 #[derive(Clone, Debug)]
-pub enum BinaryInstr {
-    Add { lhs: InstrId, rhs: InstrId },
-    Sub { lhs: InstrId, rhs: InstrId },
-    Mul { lhs: InstrId, rhs: InstrId },
-    Div { lhs: InstrId, rhs: InstrId },
-    Rem { lhs: InstrId, rhs: InstrId },
-    Eq { lhs: InstrId, rhs: InstrId },
-    Neq { lhs: InstrId, rhs: InstrId },
-    Lt { lhs: InstrId, rhs: InstrId },
-    Lte { lhs: InstrId, rhs: InstrId },
-    Gt { lhs: InstrId, rhs: InstrId },
-    Gte { lhs: InstrId, rhs: InstrId },
+pub enum BinaryOpKind {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Eq,
+    Neq,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
 }
 
 #[derive(Clone, Debug)]
-pub enum UnaryInstr {
-    Neg { src: InstrId },
-    Not { src: InstrId },
+pub struct BinaryInstr {
+    pub lhs: InstrId,
+    pub rhs: InstrId,
+    pub op: BinaryOpKind,
+}
+
+#[derive(Clone, Debug)]
+pub enum UnaryOpKind {
+    Neg,
+    Not,
+}
+
+#[derive(Clone, Debug)]
+pub struct UnaryInstr {
+    pub value: InstrId,
+    pub op: UnaryOpKind,
 }
 
 #[derive(Clone, Debug)]

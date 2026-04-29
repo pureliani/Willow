@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     ast::{decl::TypeAliasDecl, Span, SymbolId},
     compile::interner::GenericSubstitutions,
@@ -7,66 +5,13 @@ use crate::{
     hir::{
         builders::{Builder, InModule},
         errors::{SemanticError, SemanticErrorKind},
-        types::{
-            checked_declaration::{
-                CheckedDeclaration, CheckedTypeAliasDecl, GenericDeclaration,
-            },
-            checked_type::Type,
+        types::checked_declaration::{
+            CheckedDeclaration, CheckedTypeAliasDecl, GenericDeclaration,
         },
-        utils::scope::ScopeKind,
     },
 };
 
 impl<'a> Builder<'a, InModule> {
-    pub fn early_check_generic_type_alias(&mut self, decl: TypeAliasDecl) {
-        let mut generic_subs = HashMap::new();
-
-        for param in &decl.generic_params {
-            let constraint_ty = param.extends.as_ref().map(|constraint_ast| {
-                self.check_type_annotation(constraint_ast, &generic_subs).id
-            });
-
-            let gen_ty = self.types.intern(&Type::GenericParam {
-                identifier: param.identifier.clone(),
-                extends: constraint_ty,
-            });
-
-            generic_subs.insert(param.identifier.name, gen_ty);
-        }
-
-        let check_scope = self
-            .current_scope
-            .enter(ScopeKind::GenericParams, decl.identifier.span.start);
-        for param in &decl.generic_params {
-            check_scope.map_name_to_symbol(
-                param.identifier.name,
-                SymbolId::GenericParameter(param.identifier.name),
-            );
-        }
-
-        let context = InModule {
-            path: self.context.path.clone(),
-        };
-
-        let temp_errors = self.with_dummy_builder(context, check_scope, |temp_builder| {
-            temp_builder.check_type_annotation(&decl.value, &generic_subs);
-        });
-
-        if !temp_errors.is_empty() {
-            self.errors.extend(temp_errors);
-
-            if let Some(SymbolId::Generic(gen_id)) =
-                self.current_scope.lookup(decl.identifier.name)
-            {
-                if let Some(GenericDeclaration::TypeAlias { has_errors, .. }) =
-                    self.program.generic_declarations.get_mut(&gen_id)
-                {
-                    *has_errors = true;
-                }
-            }
-        }
-    }
-
     pub fn build_type_alias_decl(
         &mut self,
         type_alias_decl: TypeAliasDecl,

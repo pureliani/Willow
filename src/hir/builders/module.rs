@@ -7,11 +7,6 @@ impl<'a> Builder<'a, InModule> {
             errors: self.errors,
             current_scope: self.current_scope.clone(),
             context: InGlobal,
-            condition_facts: self.condition_facts,
-            current_facts: self.current_facts,
-            incomplete_fact_merges: self.incomplete_fact_merges,
-            aliases: self.aliases,
-            types: self.types,
             own_declarations: self.own_declarations,
         }
     }

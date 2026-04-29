@@ -1,39 +1,21 @@
 use crate::{
     ast::expr::Expr,
-    compile::interner::GenericSubstitutions,
     hir::{
-        builders::{Builder, InBlock, ValueId},
-        types::checked_type::SpannedType,
+        builders::{Builder, InBlock},
+        instructions::InstrId,
     },
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_and_expr(
-        &mut self,
-        left: Expr,
-        right: Expr,
-        expected_type: Option<&SpannedType>,
-        substitutions: &GenericSubstitutions,
-    ) -> ValueId {
+    pub fn build_and_expr(&mut self, left: Expr, right: Expr) -> InstrId {
         let span = left.span.clone();
-        let bool_type = self.types.bool(None);
-        let expected_left = SpannedType {
-            id: bool_type,
-            span: left.span.clone(),
-        };
-
-        let expected_right = SpannedType {
-            id: bool_type,
-            span: right.span.clone(),
-        };
 
         let left_span = left.span.clone();
-        let left_id = self.build_expr(left, Some(&expected_left), substitutions);
+        let left_id = self.build_expr(left);
 
-        let result = self.emit_logical_and(left_id, left_span, |builder| {
-            builder.build_expr(right, Some(&expected_right), substitutions)
-        });
+        let result = self
+            .emit_logical_and(left_id, left_span, |builder| builder.build_expr(right));
 
-        self.check_expected(result, span, expected_type)
+        result
     }
 }

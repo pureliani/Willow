@@ -1,42 +1,25 @@
 use crate::{
     ast::Span,
-    compile::interner::TypeId,
     hir::{
-        builders::{BasicBlockId, Builder, ConditionFact, InBlock, ValueId},
-        instructions::{CallInstr, Instruction, Terminator},
-        types::checked_type::LiteralType,
-        utils::facts::FactSet,
+        builders::{BasicBlockId, Builder, ExpectBody, InBlock},
+        instructions::{
+            CallInstr, InstrDefinition, InstrId, InstructionKind, Terminator,
+        },
     },
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn push_instruction(&mut self, instruction: Instruction) {
-        self.check_no_terminator();
-        let bb = self.bb_mut();
-        bb.instructions.push(instruction);
+    pub fn push_instruction(&mut self, instr: InstrDefinition) -> InstrId {
+        self.get_fn_mut().expect_body().push_instruction(instr)
     }
 
-    pub fn check_no_terminator(&mut self) {
-        let bb = self.bb_mut();
-
-        if bb.terminator.is_some() {
-            panic!(
-                "INTERNAL COMPILER ERROR: Tried re-set terminator or tried to add an \
-                 instruction to a basic block (ID: {}) that has already been terminated",
-                bb.id.0
-            );
-        }
-    }
-
-    pub fn emit_call(
-        &mut self,
-        func: ValueId,
-        args: Vec<ValueId>,
-        return_type: TypeId,
-    ) -> ValueId {
-        let dest = self.new_value_id(return_type);
-        self.push_instruction(Instruction::Call(CallInstr { dest, func, args }));
-        dest
+    pub fn emit_call(&mut self, func: InstrId, args: Vec<InstrId>) -> InstrId {
+        self.push_instruction(InstructionKind::Call(CallInstr {
+            func,
+            args,
+            memory_in: todo!(),
+            memory_out: todo!(),
+        }))
     }
 
     pub fn emit_jmp(&mut self, target: BasicBlockId) {
@@ -144,12 +127,9 @@ impl<'a> Builder<'a, InBlock> {
     where
         F: FnOnce(&mut Self) -> ValueId,
     {
-        let left_facts = self.condition_facts.get(&left).cloned().unwrap_or_default();
-
         let right_entry_block = self.as_fn().new_bb();
         let merge_block = self.as_fn().new_bb();
 
-        let bool_ty = self.types.bool(None);
         let result_ptr = self.emit_stack_alloc(bool_ty, 1);
 
         let const_false = self.emit_materialize(LiteralType::Bool(false)); // FIX
