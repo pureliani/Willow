@@ -5,9 +5,9 @@ use std::{
 
 use crate::{
     globals::STRING_INTERNER,
-    mir::types::{
+    hir::types::{
         checked_declaration::{CheckedParam, FnType},
-        checked_type::{LiteralType, StructKind, Type},
+        checked_type::{FnTypeKind, StructKind, Type},
         ordered_float::{OrderedF32, OrderedF64},
     },
     tokenize::{NumberKind, TokenKind},
@@ -129,91 +129,47 @@ impl TypeInterner {
 
 impl TypeInterner {
     pub fn bool(&self, literal: Option<bool>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::Bool(value)))
-        } else {
-            self.intern(&Type::Bool)
-        }
+        self.intern(&Type::Bool(literal))
     }
 
     pub fn i8(&self, literal: Option<i8>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::I8(value)))
-        } else {
-            self.intern(&Type::I8)
-        }
+        self.intern(&Type::I8(literal))
     }
 
     pub fn i16(&self, literal: Option<i16>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::I16(value)))
-        } else {
-            self.intern(&Type::I16)
-        }
+        self.intern(&Type::I16(literal))
     }
 
     pub fn i32(&self, literal: Option<i32>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::I32(value)))
-        } else {
-            self.intern(&Type::I32)
-        }
+        self.intern(&Type::I32(literal))
     }
 
     pub fn i64(&self, literal: Option<i64>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::I64(value)))
-        } else {
-            self.intern(&Type::I64)
-        }
+        self.intern(&Type::I64(literal))
     }
 
     pub fn isize(&self, literal: Option<isize>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::ISize(value)))
-        } else {
-            self.intern(&Type::ISize)
-        }
+        self.intern(&Type::ISize(literal))
     }
 
     pub fn u8(&self, literal: Option<u8>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::U8(value)))
-        } else {
-            self.intern(&Type::U8)
-        }
+        self.intern(&Type::U8(literal))
     }
 
     pub fn u16(&self, literal: Option<u16>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::U16(value)))
-        } else {
-            self.intern(&Type::U16)
-        }
+        self.intern(&Type::U16(literal))
     }
 
     pub fn u32(&self, literal: Option<u32>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::U32(value)))
-        } else {
-            self.intern(&Type::U32)
-        }
+        self.intern(&Type::U32(literal))
     }
 
     pub fn u64(&self, literal: Option<u64>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::U64(value)))
-        } else {
-            self.intern(&Type::U64)
-        }
+        self.intern(&Type::U64(literal))
     }
 
     pub fn usize(&self, literal: Option<usize>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::USize(value)))
-        } else {
-            self.intern(&Type::USize)
-        }
+        self.intern(&Type::USize(literal))
     }
 
     pub fn ptr(&self, to: TypeId) -> TypeId {
@@ -221,44 +177,32 @@ impl TypeInterner {
     }
 
     pub fn f32(&self, literal: Option<OrderedF32>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::F32(value)))
-        } else {
-            self.intern(&Type::F32)
-        }
+        self.intern(&Type::F32(literal))
     }
 
     pub fn f64(&self, literal: Option<OrderedF64>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::F64(value)))
-        } else {
-            self.intern(&Type::F64)
-        }
+        self.intern(&Type::F64(literal))
     }
 
     pub fn string(&self, literal: Option<StringId>) -> TypeId {
-        if let Some(value) = literal {
-            self.intern(&Type::Literal(LiteralType::String(value)))
-        } else {
-            let header_ty = self.intern(&Type::Struct(StructKind::String));
-            self.ptr(header_ty)
-        }
+        let header_ty = self.intern(&Type::Struct(StructKind::String(literal)));
+        self.ptr(header_ty)
     }
 
     pub fn unknown(&self) -> TypeId {
-        self.intern(&Type::Literal(LiteralType::Unknown))
+        self.intern(&Type::Unknown)
     }
 
     pub fn null(&self) -> TypeId {
-        self.intern(&Type::Literal(LiteralType::Null))
+        self.intern(&Type::Null)
     }
 
     pub fn void(&self) -> TypeId {
-        self.intern(&Type::Literal(LiteralType::Void))
+        self.intern(&Type::Void)
     }
 
     pub fn never(&self) -> TypeId {
-        self.intern(&Type::Literal(LiteralType::Never))
+        self.intern(&Type::Never)
     }
 }
 
@@ -304,7 +248,7 @@ impl TypeInterner {
         for ty_id in types {
             let ty = self.resolve(ty_id);
 
-            if matches!(ty, Type::Literal(LiteralType::Never)) {
+            if matches!(ty, Type::Never) {
                 continue;
             }
 
@@ -316,7 +260,7 @@ impl TypeInterner {
         }
 
         if flat.is_empty() {
-            return self.intern(&Type::Literal(LiteralType::Never));
+            return self.intern(&Type::Never);
         }
 
         if flat.len() == 1 {
@@ -369,113 +313,96 @@ impl TypeInterner {
         }
     }
 
-    pub fn widen_literal(&self, ty: LiteralType) -> TypeId {
+    pub fn widen_literal(&self, ty: Type) -> TypeId {
         match ty {
-            LiteralType::I8(_) => self.i8(None),
-            LiteralType::I16(_) => self.i16(None),
-            LiteralType::I32(_) => self.i32(None),
-            LiteralType::I64(_) => self.i64(None),
-            LiteralType::ISize(_) => self.isize(None),
+            Type::I8(_) => self.i8(None),
+            Type::I16(_) => self.i16(None),
+            Type::I32(_) => self.i32(None),
+            Type::I64(_) => self.i64(None),
+            Type::ISize(_) => self.isize(None),
 
-            LiteralType::U8(_) => self.u8(None),
-            LiteralType::U16(_) => self.u16(None),
-            LiteralType::U32(_) => self.u32(None),
-            LiteralType::U64(_) => self.u64(None),
-            LiteralType::USize(_) => self.usize(None),
+            Type::U8(_) => self.u8(None),
+            Type::U16(_) => self.u16(None),
+            Type::U32(_) => self.u32(None),
+            Type::U64(_) => self.u64(None),
+            Type::USize(_) => self.usize(None),
 
-            LiteralType::F32(_) => self.f32(None),
-            LiteralType::F64(_) => self.f64(None),
+            Type::F32(_) => self.f32(None),
+            Type::F64(_) => self.f64(None),
 
-            LiteralType::Bool(_) => self.bool(None),
+            Type::Bool(_) => self.bool(None),
 
-            LiteralType::String(_) => {
-                let target = self.intern(&Type::Struct(StructKind::String));
+            Type::String(_) => {
+                let target = self.intern(&Type::Struct(StructKind::String(None)));
                 self.ptr(target)
             }
-            LiteralType::Void => self.void(),
-            LiteralType::Never => self.never(),
-            LiteralType::Unknown => self.unknown(),
-            LiteralType::Null => self.null(),
-            LiteralType::Fn(declaration_id) => {
-                self.intern(&Type::Literal(LiteralType::Fn(declaration_id)))
+            Type::Void => self.void(),
+            Type::Never => self.never(),
+            Type::Unknown => self.unknown(),
+            Type::Null => self.null(),
+            Type::Fn(declaration_id) => {
+                todo!()
             }
         }
     }
 
-    pub fn get_numeric_type_rank(&self, ty: TypeId) -> Option<i32> {
+    pub fn get_numeric_type_rank(&self, id: TypeId) -> Option<i32> {
         use Type::*;
-        let widened = match self.resolve(ty) {
-            Literal(lt) => {
-                let widened_id = self.widen_literal(lt);
-                self.resolve(widened_id)
-            }
-            t => t,
-        };
+        let ty = self.resolve(id);
 
-        match widened {
-            I8 | U8 => Some(1),
-            I16 | U16 => Some(2),
-            I32 | U32 | ISize | USize => Some(3),
-            I64 | U64 => Some(4),
-            F32 => Some(5),
-            F64 => Some(6),
+        match ty {
+            I8(_) | U8(_) => Some(1),
+            I16(_) | U16(_) => Some(2),
+            I32(_) | U32(_) | ISize(_) | USize(_) => Some(3),
+            I64(_) | U64(_) => Some(4),
+            F32(_) => Some(5),
+            F64(_) => Some(6),
             _ => None,
         }
     }
 
-    pub fn is_float(&self, ty: TypeId) -> bool {
+    pub fn is_float(&self, id: TypeId) -> bool {
         use Type::*;
-        let widened = match self.resolve(ty) {
-            Literal(lt) => {
-                let widened_id = self.widen_literal(lt);
-                self.resolve(widened_id)
-            }
-            t => t,
-        };
+        let ty = self.resolve(id);
 
-        matches!(widened, F32 | F64)
+        matches!(ty, F32(_) | F64(_))
     }
 
-    pub fn is_integer(&self, ty: TypeId) -> bool {
+    pub fn is_integer(&self, id: TypeId) -> bool {
         use Type::*;
-        let widened = match self.resolve(ty) {
-            Literal(lt) => {
-                let widened_id = self.widen_literal(lt);
-                self.resolve(widened_id)
-            }
-            t => t,
-        };
+        let ty = self.resolve(id);
+
         matches!(
-            widened,
-            I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | ISize | USize
+            ty,
+            I8(_)
+                | I16(_)
+                | I32(_)
+                | I64(_)
+                | U8(_)
+                | U16(_)
+                | U32(_)
+                | U64(_)
+                | ISize(_)
+                | USize(_)
         )
     }
 
-    pub fn is_signed(&self, ty: TypeId) -> bool {
+    pub fn is_signed(&self, id: TypeId) -> bool {
         use Type::*;
-        let widened = match self.resolve(ty) {
-            Literal(lt) => {
-                let widened_id = self.widen_literal(lt);
-                self.resolve(widened_id)
-            }
-            t => t,
-        };
-        matches!(widened, I8 | I16 | I32 | I64 | ISize | F32 | F64)
+        let ty = self.resolve(id);
+        matches!(
+            ty,
+            I8(_) | I16(_) | I32(_) | I64(_) | ISize(_) | F32(_) | F64(_)
+        )
     }
 
-    pub fn is_pointer(&self, ty: TypeId) -> bool {
-        matches!(self.resolve(ty), Type::Pointer(_))
+    pub fn is_pointer(&self, id: TypeId) -> bool {
+        matches!(self.resolve(id), Type::Pointer(_))
     }
 
-    pub fn is_bool(&self, ty: TypeId) -> bool {
-        let widened = match self.resolve(ty) {
-            Type::Literal(lt) => {
-                let widened_id = self.widen_literal(lt);
-                self.resolve(widened_id)
-            }
-            t => t,
-        };
-        matches!(widened, Type::Bool)
+    pub fn is_bool(&self, id: TypeId) -> bool {
+        let ty = self.resolve(id);
+        matches!(ty, Type::Bool(_))
     }
 }
 

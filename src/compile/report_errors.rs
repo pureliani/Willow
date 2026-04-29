@@ -10,7 +10,7 @@ use crate::{
     ast::{ModulePath, Span},
     compile::{Compiler, CompilerErrorKind},
     globals::STRING_INTERNER,
-    mir::errors::SemanticErrorKind,
+    hir::errors::SemanticErrorKind,
     parse::ParsingErrorKind,
     tokenize::TokenizationErrorKind,
 };

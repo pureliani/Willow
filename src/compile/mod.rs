@@ -1,6 +1,6 @@
 use crate::codegen::CodeGenerator;
 use crate::compile::interner::TypeInterner;
-use crate::mir::statements::from::is_linkable_external_file;
+use crate::hir::statements::from::is_linkable_external_file;
 use crate::{
     ast::{
         decl::Declaration,
@@ -10,7 +10,7 @@ use crate::{
     },
     compile::file_cache::FileCache,
     globals::STRING_INTERNER,
-    mir::{
+    hir::{
         builders::{Builder, InGlobal, Program},
         errors::SemanticError,
         utils::{
