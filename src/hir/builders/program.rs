@@ -1,5 +1,10 @@
 use crate::{
-    ast::{decl::Declaration, expr::ExprKind, stmt::StmtKind, ModulePath, Position},
+    ast::{
+        decl::{Declaration, FnDecl},
+        expr::ExprKind,
+        stmt::StmtKind,
+        ModulePath, Position,
+    },
     compile::ParallelParseResult,
     hir::{
         builders::{Builder, InGlobal, InModule, Module},
@@ -96,7 +101,7 @@ impl<'a> Builder<'a, InGlobal> {
 }
 
 impl<'a> Builder<'a, InModule> {
-    fn register_fn_signature(&mut self, f: &crate::ast::decl::FnDecl) {
+    fn register_fn_signature(&mut self, f: &FnDecl) {
         let decl_id = f.id;
         let decl_name = f.identifier.name;
 

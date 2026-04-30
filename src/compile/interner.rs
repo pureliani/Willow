@@ -6,8 +6,7 @@ use std::{
 use crate::{
     globals::STRING_INTERNER,
     hir::types::{
-        checked_declaration::{CheckedParam, FnType},
-        checked_type::{FnTypeKind, StructKind, Type},
+        checked_type::{CheckedParam, FnType, StructKind, Type},
         ordered_float::{OrderedF32, OrderedF64},
     },
     tokenize::{NumberKind, TokenKind},
@@ -313,39 +312,6 @@ impl TypeInterner {
         }
     }
 
-    pub fn widen_literal(&self, ty: Type) -> TypeId {
-        match ty {
-            Type::I8(_) => self.i8(None),
-            Type::I16(_) => self.i16(None),
-            Type::I32(_) => self.i32(None),
-            Type::I64(_) => self.i64(None),
-            Type::ISize(_) => self.isize(None),
-
-            Type::U8(_) => self.u8(None),
-            Type::U16(_) => self.u16(None),
-            Type::U32(_) => self.u32(None),
-            Type::U64(_) => self.u64(None),
-            Type::USize(_) => self.usize(None),
-
-            Type::F32(_) => self.f32(None),
-            Type::F64(_) => self.f64(None),
-
-            Type::Bool(_) => self.bool(None),
-
-            Type::String(_) => {
-                let target = self.intern(&Type::Struct(StructKind::String(None)));
-                self.ptr(target)
-            }
-            Type::Void => self.void(),
-            Type::Never => self.never(),
-            Type::Unknown => self.unknown(),
-            Type::Null => self.null(),
-            Type::Fn(declaration_id) => {
-                todo!()
-            }
-        }
-    }
-
     pub fn get_numeric_type_rank(&self, id: TypeId) -> Option<i32> {
         use Type::*;
         let ty = self.resolve(id);
@@ -422,19 +388,27 @@ impl TypeInterner {
         }
 
         let result = match self.resolve(target) {
-            Type::Bool => String::from("bool"),
-            Type::U8 => String::from("u8"),
-            Type::U16 => String::from("u16"),
-            Type::U32 => String::from("u32"),
-            Type::U64 => String::from("u64"),
-            Type::USize => String::from("usize"),
-            Type::ISize => String::from("isize"),
-            Type::I8 => String::from("i8"),
-            Type::I16 => String::from("i16"),
-            Type::I32 => String::from("i32"),
-            Type::I64 => String::from("i64"),
-            Type::F32 => String::from("f32"),
-            Type::F64 => String::from("f64"),
+            Type::Bool(lit) => lit.map_or("bool", |v| &v.to_string()).to_string(),
+            Type::U8(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u8"),
+            Type::U16(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u16"),
+            Type::U32(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u32"),
+            Type::U64(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u64"),
+            Type::USize(lit) => {
+                format!("{}{}", lit.map_or("", |v| &v.to_string()), "usize")
+            }
+            Type::ISize(lit) => {
+                format!("{}{}", lit.map_or("", |v| &v.to_string()), "isize")
+            }
+            Type::I8(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i8"),
+            Type::I16(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i16"),
+            Type::I32(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i32"),
+            Type::I64(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i64"),
+            Type::F32(lit) => {
+                format!("{}{}", lit.map_or("", |v| &v.0.to_string()), "f32")
+            }
+            Type::F64(lit) => {
+                format!("{}{}", lit.map_or("", |v| &v.0.to_string()), "f64")
+            }
             Type::Struct(s) => match s {
                 StructKind::UserDefined(checked_params) => {
                     self.struct_to_string(&checked_params, visited_set)
@@ -445,31 +419,7 @@ impl TypeInterner {
                 StructKind::ListHeader(item_type) => {
                     self.list_to_string(item_type, visited_set)
                 }
-                StructKind::String => String::from("string"),
-            },
-            Type::Literal(lit) => match lit {
-                LiteralType::Void => String::from("void"),
-                LiteralType::Null => String::from("null"),
-                LiteralType::Unknown => String::from("unknown"),
-                LiteralType::Never => String::from("never"),
-
-                LiteralType::Bool(value) => value.to_string(),
-                LiteralType::U8(value) => value.to_string(),
-                LiteralType::U16(value) => value.to_string(),
-                LiteralType::U32(value) => value.to_string(),
-                LiteralType::U64(value) => value.to_string(),
-                LiteralType::USize(value) => value.to_string(),
-                LiteralType::ISize(value) => value.to_string(),
-                LiteralType::I8(value) => value.to_string(),
-                LiteralType::I16(value) => value.to_string(),
-                LiteralType::I32(value) => value.to_string(),
-                LiteralType::I64(value) => value.to_string(),
-                LiteralType::F32(value) => value.0.to_string(),
-                LiteralType::F64(value) => value.0.to_string(),
-                LiteralType::String(string_id) => {
-                    format!("\"{}\"", STRING_INTERNER.resolve(string_id))
-                }
-                LiteralType::Fn(declaration_id) => format!("fn{}", declaration_id.0),
+                StructKind::String(lit) => String::from("string"),
             },
             Type::Fn(fn_type) => self.fn_signature_to_string(&fn_type, visited_set),
             Type::Pointer(to) => {
@@ -493,6 +443,10 @@ impl TypeInterner {
                     name_str
                 }
             }
+            Type::Void => String::from("void"),
+            Type::Never => String::from("never"),
+            Type::Unknown => String::from("unknown"),
+            Type::Null => String::from("null"),
         };
 
         visited_set.remove(&target);

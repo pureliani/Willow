@@ -3,6 +3,7 @@
 #![allow(clippy::redundant_pattern_matching)]
 #![allow(clippy::large_enum_variant)]
 
+pub mod analyze;
 pub mod ast;
 pub mod codegen;
 pub mod compile;

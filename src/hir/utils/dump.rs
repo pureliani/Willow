@@ -1,11 +1,11 @@
 use crate::{
-    ast::decl::Declaration,
+    ast::decl::{Declaration, FnDecl},
     globals::STRING_INTERNER,
     hir::{
         builders::Program,
         instructions::{
-            BasicBlockId, BinaryOpKind, BuiltinFunction, FunctionCFG, InstrId,
-            InstructionKind, MakeLiteralKind, MemoryInstr, Place, Terminator,
+            BasicBlock, BasicBlockId, BinaryOpKind, BuiltinFunction, FunctionCFG,
+            InstrId, InstructionKind, MakeLiteralKind, MemoryInstr, Place, Terminator,
             UnaryOpKind,
         },
     },
@@ -26,7 +26,7 @@ pub fn dump_program(program: &Program) {
     println!("{}", out);
 }
 
-fn dump_function(f: &crate::ast::decl::FnDecl, cfg: &FunctionCFG, out: &mut String) {
+fn dump_function(f: &FnDecl, cfg: &FunctionCFG, out: &mut String) {
     let fn_name = STRING_INTERNER.resolve(f.identifier.name);
     writeln!(out, "fn {fn_name}:").unwrap();
 
@@ -37,7 +37,7 @@ fn dump_function(f: &crate::ast::decl::FnDecl, cfg: &FunctionCFG, out: &mut Stri
 
 pub fn dump_block(
     block_id: &BasicBlockId,
-    bb: &crate::hir::instructions::BasicBlock,
+    bb: &BasicBlock,
     cfg: &FunctionCFG,
     out: &mut String,
 ) {
