@@ -2,9 +2,7 @@ use crate::{
     ast::expr::Expr,
     hir::{
         builders::{Builder, InBlock},
-        instructions::{
-            BinaryInstr, BinaryOpKind, InstrDefinition, InstrId, InstructionKind,
-        },
+        instructions::{BinaryInstr, BinaryOpKind, InstrId, InstructionKind},
     },
 };
 
@@ -15,16 +13,13 @@ impl<'a> Builder<'a, InBlock> {
         let right_span = right.span.clone();
         let right_value = self.build_expr(right);
 
-        let instr = InstrDefinition {
-            block: self.context.block_id,
-            span: left_span.merge(&right_span),
-            kind: InstructionKind::Binary(BinaryInstr {
+        self.push_instruction(
+            InstructionKind::Binary(BinaryInstr {
                 lhs: left_value,
                 rhs: right_value,
                 op,
             }),
-        };
-
-        self.push_instruction(instr)
+            left_span.merge(&right_span),
+        )
     }
 }

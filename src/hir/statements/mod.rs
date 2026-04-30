@@ -1,6 +1,5 @@
 pub mod assignment;
 pub mod from;
-pub mod r#return;
 pub mod type_alias_decl;
 pub mod var_decl;
 pub mod r#while;
@@ -45,7 +44,8 @@ impl<'a> Builder<'a, InBlock> {
                 }
                 StmtKind::VarDecl(var_decl) => self.build_var_decl(var_decl),
                 StmtKind::Return { value } => {
-                    self.build_return_stmt(value, statement.span)
+                    let val_id = self.build_expr(value);
+                    self.emit_return(val_id);
                 }
                 StmtKind::Assignment { target, value } => {
                     self.build_assignment_stmt(target, value)

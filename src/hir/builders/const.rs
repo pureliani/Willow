@@ -1,43 +1,45 @@
 use crate::{
-    ast::DeclarationId,
+    ast::{DeclarationId, Span},
     compile::interner::StringId,
     hir::{
-        builders::{Builder, InBlock, ValueId},
-        types::{
-            checked_declaration::CheckedDeclaration,
-            checked_type::{LiteralType, Type},
-        },
+        builders::{Builder, InBlock},
+        instructions::{InstrId, InstructionKind, MakeLiteralKind},
+        types::checked_declaration::CheckedDeclaration,
     },
     tokenize::NumberKind,
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn emit_number(&mut self, val: NumberKind) -> ValueId {
-        let ty = self.types.from_number_kind(&val);
-        self.new_value_id(ty)
+    pub fn emit_number(&mut self, val: NumberKind, span: Span) -> InstrId {
+        self.push_instruction(
+            InstructionKind::MakeLiteral(MakeLiteralKind::Number(val)),
+            span,
+        )
     }
 
-    pub fn emit_bool(&mut self, val: bool) -> ValueId {
-        let ty = self.types.bool(Some(val));
-        self.new_value_id(ty)
+    pub fn emit_bool(&mut self, val: bool, span: Span) -> InstrId {
+        self.push_instruction(
+            InstructionKind::MakeLiteral(MakeLiteralKind::Bool(val)),
+            span,
+        )
     }
 
-    pub fn emit_string(&mut self, val: StringId) -> ValueId {
-        let ty = self.types.string(Some(val));
-        self.new_value_id(ty)
+    pub fn emit_string(&mut self, val: StringId, span: Span) -> InstrId {
+        self.push_instruction(
+            InstructionKind::MakeLiteral(MakeLiteralKind::String(val)),
+            span,
+        )
     }
 
-    pub fn emit_void(&mut self) -> ValueId {
-        let ty = self.types.void();
-        self.new_value_id(ty)
+    pub fn emit_void(&mut self, span: Span) -> InstrId {
+        self.push_instruction(InstructionKind::MakeLiteral(MakeLiteralKind::Void), span)
     }
 
-    pub fn emit_null(&mut self) -> ValueId {
-        let ty = self.types.null();
-        self.new_value_id(ty)
+    pub fn emit_null(&mut self, span: Span) -> InstrId {
+        self.push_instruction(InstructionKind::MakeLiteral(MakeLiteralKind::Null), span)
     }
 
-    pub fn emit_const_fn(&mut self, decl_id: DeclarationId) -> ValueId {
+    pub fn emit_const_fn(&mut self, decl_id: DeclarationId, span: Span) -> InstrId {
         let decl = self
             .program
             .declarations
@@ -48,8 +50,9 @@ impl<'a> Builder<'a, InBlock> {
             panic!("INTERNAL COMPILER ERROR: Declaration is not a function");
         }
 
-        let ty = self.types.intern(&Type::Literal(LiteralType::Fn(decl_id)));
-
-        self.new_value_id(ty)
+        self.push_instruction(
+            InstructionKind::MakeLiteral(MakeLiteralKind::Fn(decl_id)),
+            span,
+        )
     }
 }

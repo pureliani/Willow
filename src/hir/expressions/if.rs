@@ -3,11 +3,11 @@ use crate::{
         expr::{BlockContents, Expr},
         Span,
     },
-    compile::interner::{GenericSubstitutions, TypeId},
+    compile::interner::TypeId,
     hir::{
-        builders::{BasicBlockId, Builder, ExpectBody, InBlock, ValueId},
+        builders::{Builder, ExpectBody, InBlock},
         errors::{SemanticError, SemanticErrorKind},
-        instructions::{Instruction, MemoryInstr},
+        instructions::{BasicBlockId, InstrId, MemoryInstr},
         types::checked_type::SpannedType,
     },
 };
@@ -24,87 +24,37 @@ impl<'a> Builder<'a, InBlock> {
         branches: Vec<(Box<Expr>, BlockContents)>,
         mut else_branch: Option<BlockContents>,
         context: IfContext,
-        expected_type: Option<&SpannedType>,
-        substitutions: &GenericSubstitutions,
-    ) -> ValueId {
+    ) -> InstrId {
         let expr_span = branches.first().unwrap().0.span.clone();
 
         if context == IfContext::Expression && else_branch.is_none() {
-            return self.report_error_and_get_poison(SemanticError {
+            self.errors.push(SemanticError {
                 kind: SemanticErrorKind::IfExpressionMissingElse,
                 span: expr_span,
             });
+
+            return self.push_instruction();
         }
 
-        let merge_block_id = self.as_fn().new_bb();
-        let mut branch_results: Vec<(BasicBlockId, ValueId, Span)> = Vec::new();
+        let merge_block_id = self.new_block();
+        let mut branch_results: Vec<(BasicBlockId, InstrId, Span)> = Vec::new();
         let mut current_cond_block_id = self.context.block_id;
 
         for (condition, body) in branches {
             self.use_basic_block(current_cond_block_id);
 
             let condition_span = condition.span.clone();
+            let cond_id = self.build_expr(*condition);
 
-            let cond_id = self.build_expr(*condition, None, substitutions);
-            let cond_ty = self.get_value_type(cond_id);
+            let then_block_id = self.new_block();
+            let next_cond_block_id = self.new_block();
 
-            if cond_ty == self.types.unknown() {
-                return self.new_value_id(self.types.unknown());
-            }
-
-            let is_statically_true = cond_ty == self.types.bool(Some(true));
-            let is_statically_false = cond_ty == self.types.bool(Some(false));
-
-            if is_statically_false {
-                continue;
-            }
-
-            let then_block_id = self.as_fn().new_bb();
-
-            if is_statically_true {
-                self.emit_jmp(then_block_id);
-                self.seal_block(then_block_id);
-                self.use_basic_block(then_block_id);
-
-                let (then_val, then_val_span) =
-                    self.build_codeblock_expr(body, expected_type, substitutions);
-
-                if self.bb().terminator.is_none() {
-                    branch_results.push((self.context.block_id, then_val, then_val_span));
-                }
-
-                else_branch = None;
-                break;
-            }
-
-            let next_cond_block_id = self.as_fn().new_bb();
-
-            let expected = SpannedType {
-                id: self.types.bool(None),
-                span: condition_span.clone(),
-            };
-            let runtime_cond_id =
-                self.check_expected(cond_id, condition_span, Some(&expected));
-
-            self.emit_cond_jmp(runtime_cond_id, then_block_id, next_cond_block_id);
+            self.emit_cond_jmp(cond_id, then_block_id, next_cond_block_id);
 
             self.seal_block(then_block_id);
             self.use_basic_block(then_block_id);
 
-            if let Some(facts) = self.condition_facts.get(&cond_id).cloned() {
-                for conditional_facts in &facts {
-                    if !conditional_facts.on_true.facts.is_empty() {
-                        self.write_fact(
-                            then_block_id,
-                            &conditional_facts.place,
-                            conditional_facts.on_true.clone(),
-                        );
-                    }
-                }
-            }
-
-            let (then_val, then_val_span) =
-                self.build_codeblock_expr(body, expected_type, substitutions);
+            let (then_val, then_val_span) = self.build_codeblock_expr(body);
 
             if self.bb().terminator.is_none() {
                 branch_results.push((self.context.block_id, then_val, then_val_span));

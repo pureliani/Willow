@@ -1,24 +1,15 @@
 use crate::{
     ast::{IdentifierNode, SymbolId},
-    compile::interner::GenericSubstitutions,
     hir::{
-        builders::{Builder, InBlock, ValueId},
+        builders::{Builder, InBlock},
         errors::{SemanticError, SemanticErrorKind},
-        types::{
-            checked_declaration::{CheckedDeclaration, GenericDeclaration},
-            checked_type::SpannedType,
-        },
-        utils::place::Place,
+        instructions::InstrId,
+        types::checked_declaration::{CheckedDeclaration, GenericDeclaration},
     },
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_identifier_expr(
-        &mut self,
-        identifier: IdentifierNode,
-        expected_type: Option<&SpannedType>,
-        _substitutions: &GenericSubstitutions,
-    ) -> ValueId {
+    pub fn build_identifier_expr(&mut self, identifier: IdentifierNode) -> InstrId {
         let span = identifier.span.clone();
 
         let symbol_id = match self.current_scope.lookup(identifier.name) {

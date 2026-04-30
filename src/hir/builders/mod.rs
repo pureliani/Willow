@@ -11,7 +11,7 @@ use crate::{
     compile::interner::TypeId,
     hir::{
         errors::SemanticError,
-        instructions::{BasicBlockId, FunctionCFG},
+        instructions::{BasicBlockId, FunctionCFG, InstrId, MemoryId},
         types::{
             checked_declaration::{CheckedDeclaration, GenericDeclaration},
             checked_type::SpannedType,
@@ -21,17 +21,12 @@ use crate::{
 };
 
 pub mod basic_block;
-pub mod cast;
-pub mod comp;
 pub mod r#const;
 pub mod control_flow;
-pub mod function;
 pub mod memory;
 pub mod module;
 pub mod program;
 pub mod std_lib;
-pub mod unary;
-pub mod union;
 
 pub struct Program {
     pub modules: BTreeMap<ModulePath, Module>,
@@ -106,6 +101,12 @@ pub struct Builder<'a, C: BuilderContext> {
 
     pub errors: &'a mut Vec<SemanticError>,
     pub current_scope: Scope,
+
+    pub current_def: &'a mut BTreeMap<BasicBlockId, BTreeMap<DeclarationId, InstrId>>,
+    pub incomplete_phis: &'a mut BTreeMap<BasicBlockId, BTreeMap<DeclarationId, InstrId>>,
+
+    pub current_memory_def: &'a mut BTreeMap<BasicBlockId, MemoryId>,
+    pub incomplete_memory_phis: &'a mut BTreeMap<BasicBlockId, MemoryId>,
 
     // Tracks declarations created by this specific builder
     pub own_declarations: &'a mut HashSet<DeclarationId>,

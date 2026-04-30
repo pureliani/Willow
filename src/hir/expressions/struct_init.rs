@@ -2,13 +2,14 @@ use std::collections::HashSet;
 
 use crate::{
     ast::{expr::Expr, IdentifierNode, Span},
-    compile::interner::{GenericSubstitutions, StringId},
+    compile::interner::StringId,
     hir::{
-        builders::{Builder, InBlock, ValueId},
+        builders::{Builder, InBlock},
         errors::{SemanticError, SemanticErrorKind},
+        instructions::InstrId,
         types::{
             checked_declaration::CheckedParam,
-            checked_type::{LiteralType, SpannedType, StructKind, Type},
+            checked_type::{SpannedType, StructKind, Type},
         },
         utils::layout::{get_layout_of, pack_struct},
     },
@@ -19,10 +20,8 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         span: Span,
         fields: Vec<(IdentifierNode, Expr)>,
-        expected_type: Option<&SpannedType>,
         by_value: bool,
-        substitutions: &GenericSubstitutions,
-    ) -> ValueId {
+    ) -> InstrId {
         let mut seen_names: HashSet<StringId> = HashSet::new();
         let mut evaluated_fields = Vec::with_capacity(fields.len());
         let mut anonymous_params = Vec::new();
@@ -37,27 +36,7 @@ impl<'a> Builder<'a, InBlock> {
                 });
             }
 
-            let expected_field_type = expected_type.and_then(|et| {
-                let mut ty_id = et.id;
-
-                if self.types.is_pointer(ty_id) {
-                    ty_id = self.types.unwrap_ptr(ty_id);
-                }
-
-                if let Type::Struct(sk) = self.types.resolve(ty_id) {
-                    sk.get_field(self.types, &field_name.name)
-                        .map(|(_, t)| SpannedType {
-                            id: t,
-                            span: field_name.span.clone(),
-                        })
-                } else {
-                    None
-                }
-            });
-
-            let val_id =
-                self.build_expr(field_expr, expected_field_type.as_ref(), substitutions);
-            let val_ty = self.get_value_type(val_id);
+            let val_id = self.build_expr(field_expr);
 
             evaluated_fields.push((field_name.clone(), val_id));
 
@@ -104,6 +83,6 @@ impl<'a> Builder<'a, InBlock> {
             self.emit_load(base_ptr)
         };
 
-        self.check_expected(result, span, expected_type)
+        result
     }
 }

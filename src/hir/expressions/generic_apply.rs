@@ -4,11 +4,11 @@ use crate::{
         type_annotation::TypeAnnotation,
         Span, SymbolId,
     },
-    compile::interner::GenericSubstitutions,
     hir::{
-        builders::{Builder, InBlock, ValueId},
+        builders::{Builder, InBlock},
         errors::{SemanticError, SemanticErrorKind},
-        types::{checked_declaration::GenericDeclaration, checked_type::SpannedType},
+        instructions::InstrId,
+        types::checked_declaration::GenericDeclaration,
     },
 };
 
@@ -18,9 +18,7 @@ impl<'a> Builder<'a, InBlock> {
         left: Expr,
         type_args: Vec<TypeAnnotation>,
         span: Span,
-        expected_type: Option<&SpannedType>,
-        substitutions: &GenericSubstitutions,
-    ) -> ValueId {
+    ) -> InstrId {
         let ident = match left.kind {
             ExprKind::Identifier(id) => id,
             _ => {

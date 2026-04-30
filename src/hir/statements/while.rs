@@ -1,27 +1,25 @@
 use crate::{
     ast::expr::{BlockContents, Expr},
     hir::{
-        builders::{Builder, ExpectBody, InBlock},
+        builders::{Builder, InBlock},
         utils::scope::ScopeKind,
     },
 };
 
 impl<'a> Builder<'a, InBlock> {
     pub fn build_while_stmt(&mut self, condition: Expr, body: BlockContents) {
-        let header_block_id = self.as_fn().new_bb();
-        let body_block_id = self.as_fn().new_bb();
-        let exit_block_id = self.as_fn().new_bb();
+        let header_block_id = self.new_block();
+        let body_block_id = self.new_block();
+        let exit_block_id = self.new_block();
 
         self.emit_jmp(header_block_id);
         self.use_basic_block(header_block_id);
 
-        let condition_span = condition.span.clone();
         let cond_id = self.build_expr(condition);
-
         self.emit_cond_jmp(cond_id, body_block_id, exit_block_id);
 
-        self.seal_block(body_block_id);
         self.use_basic_block(body_block_id);
+        self.seal_block(body_block_id);
 
         self.current_scope = self.current_scope.enter(
             ScopeKind::WhileBody {
@@ -41,13 +39,7 @@ impl<'a> Builder<'a, InBlock> {
             .exit(body.span.end)
             .expect("INTERNAL COMPILER ERROR: Scope mismatch");
 
-        if self
-            .get_fn()
-            .expect_body()
-            .get_block(self.context.block_id)
-            .terminator
-            .is_none()
-        {
+        if self.bb().terminator.is_none() {
             self.emit_jmp(header_block_id);
         }
 

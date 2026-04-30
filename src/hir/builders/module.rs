@@ -8,6 +8,10 @@ impl<'a> Builder<'a, InModule> {
             current_scope: self.current_scope.clone(),
             context: InGlobal,
             own_declarations: self.own_declarations,
+            current_def: self.current_def,
+            incomplete_phis: self.incomplete_phis,
+            current_memory_def: self.current_memory_def,
+            incomplete_memory_phis: self.incomplete_memory_phis,
         }
     }
 

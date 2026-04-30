@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::{
     ast::{
@@ -11,52 +11,13 @@ use crate::{
     globals::next_generic_declaration_id,
     hir::{
         builders::{
-            Builder, BuilderContext, CheckedFunctionDecl, FunctionBodyKind,
-            FunctionParam, GenericDeclaration, InGlobal, InModule, Module,
+            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam,
+            GenericDeclaration, InGlobal, InModule, Module,
         },
-        errors::SemanticError,
         types::checked_declaration::CheckedDeclaration,
-        utils::scope::{Scope, ScopeKind},
+        utils::scope::ScopeKind,
     },
 };
-
-impl<'a, C: BuilderContext> Builder<'a, C> {
-    /// Creates an isolated dummy builder which guarantees that
-    /// all declarations created by it are cleaned up afterwards.
-    /// returns any semantic errors caught during the dummy build
-    pub fn with_dummy_builder<NewC: BuilderContext, F>(
-        &mut self,
-        context: NewC,
-        scope: Scope,
-        f: F,
-    ) -> Vec<SemanticError>
-    where
-        F: FnOnce(&mut Builder<'_, NewC>),
-    {
-        let mut temp_errors = Vec::new();
-        let mut temp_own_declarations = HashSet::new();
-
-        let mut dummy_builder = Builder {
-            context,
-            program: self.program,
-            errors: &mut temp_errors,
-            current_scope: scope,
-            own_declarations: &mut temp_own_declarations,
-        };
-
-        f(&mut dummy_builder);
-
-        for id in &temp_own_declarations {
-            self.program.declarations.remove(id);
-        }
-
-        self.program
-            .monomorphizations
-            .retain(|_, v| !temp_own_declarations.contains(v));
-
-        temp_errors
-    }
-}
 
 impl<'a> Builder<'a, InGlobal> {
     pub fn build(&mut self, mut modules: Vec<ParallelParseResult>) {

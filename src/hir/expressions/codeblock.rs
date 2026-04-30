@@ -1,20 +1,14 @@
 use crate::{
     ast::{expr::BlockContents, Span},
-    compile::interner::GenericSubstitutions,
     hir::{
-        builders::{Builder, InBlock, ValueId},
-        types::checked_type::SpannedType,
+        builders::{Builder, InBlock},
+        instructions::InstrId,
         utils::scope::ScopeKind,
     },
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_codeblock_expr(
-        &mut self,
-        codeblock: BlockContents,
-        expected_type: Option<&SpannedType>,
-        substitutions: &GenericSubstitutions,
-    ) -> (ValueId, Span) {
+    pub fn build_codeblock_expr(&mut self, codeblock: BlockContents) -> (InstrId, Span) {
         let mut final_expr_span = Span {
             start: codeblock.span.end,
             end: codeblock.span.end,
@@ -25,12 +19,12 @@ impl<'a> Builder<'a, InBlock> {
             .current_scope
             .enter(ScopeKind::CodeBlock, codeblock.span.start);
 
-        self.build_statements(codeblock.statements, substitutions);
+        self.build_statements(codeblock.statements);
         let result_id = if let Some(final_expr) = codeblock.final_expr {
             final_expr_span = final_expr.span.clone();
-            self.build_expr(*final_expr, expected_type, substitutions)
+            self.build_expr(*final_expr)
         } else {
-            self.emit_void()
+            self.emit_void(codeblock.span.clone())
         };
 
         self.current_scope = self

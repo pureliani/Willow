@@ -1,7 +1,6 @@
 pub mod access;
 pub mod and;
 pub mod binary;
-pub mod bool;
 pub mod codeblock;
 pub mod r#fn;
 pub mod fn_call;
@@ -10,8 +9,6 @@ pub mod identifier;
 pub mod r#if;
 pub mod is_type;
 pub mod list_literal;
-pub mod null;
-pub mod number;
 pub mod or;
 pub mod static_access;
 pub mod string;
@@ -25,16 +22,20 @@ use crate::{
     hir::{
         builders::{Builder, InBlock},
         expressions::r#if::IfContext,
-        instructions::{BinaryOpKind, InstrId},
+        instructions::{BinaryOpKind, InstrId, UnaryOpKind},
     },
 };
 
 impl<'a> Builder<'a, InBlock> {
     pub fn build_expr(&mut self, expr: Expr) -> InstrId {
         let span = expr.span.clone();
-        let result = match expr.kind {
-            ExprKind::Not { right } => self.build_not_expr(*right),
-            ExprKind::Neg { right } => self.build_neg_expr(*right),
+        match expr.kind {
+            ExprKind::Not { right } => {
+                self.build_unary(expr.span, *right, UnaryOpKind::Not)
+            }
+            ExprKind::Neg { right } => {
+                self.build_unary(expr.span, *right, UnaryOpKind::Neg)
+            }
             ExprKind::Add { left, right } => {
                 self.build_binary(*left, *right, BinaryOpKind::Add)
             }
@@ -70,8 +71,8 @@ impl<'a> Builder<'a, InBlock> {
             }
             ExprKind::And { left, right } => self.build_and_expr(*left, *right),
             ExprKind::Or { left, right } => self.build_or_expr(*left, *right),
-            ExprKind::BoolLiteral(value) => self.emit_bool(value),
-            ExprKind::Number(number_kind) => self.emit_number(number_kind),
+            ExprKind::BoolLiteral(value) => self.emit_bool(value, expr.span),
+            ExprKind::Number(number_kind) => self.emit_number(number_kind, expr.span),
             ExprKind::String(string_node) => self.build_string_literal(string_node),
             ExprKind::Struct(fields) => self.build_struct_init_expr(span, fields, false),
             ExprKind::List(items) => self.build_list_literal_expr(span, items),
@@ -95,13 +96,11 @@ impl<'a> Builder<'a, InBlock> {
                 self.build_typecast_expr(*left, target)
             }
             ExprKind::IsType { left, ty } => self.build_is_type_expr(*left, ty),
-            ExprKind::Null => self.build_null_expr(span),
+            ExprKind::Null => self.emit_null(expr.span),
             ExprKind::TemplateString(parts) => self.build_template_expr(parts, span),
             ExprKind::GenericApply { left, type_args } => {
                 self.build_generic_apply_expr(*left, type_args, span)
             }
-        };
-
-        self.check_expected(result, expr.span)
+        }
     }
 }

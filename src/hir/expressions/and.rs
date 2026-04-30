@@ -8,8 +8,6 @@ use crate::{
 
 impl<'a> Builder<'a, InBlock> {
     pub fn build_and_expr(&mut self, left: Expr, right: Expr) -> InstrId {
-        let span = left.span.clone();
-
         let left_span = left.span.clone();
         let left_id = self.build_expr(left);
 
