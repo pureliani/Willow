@@ -1,30 +1,21 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use crate::{
-    ast::{decl::FnDecl, Span},
-    compile::interner::GenericSubstitutions,
-    globals::{next_declaration_id, STRING_INTERNER},
+    ast::decl::{Declaration, FnDecl},
+    globals::STRING_INTERNER,
     hir::{
-        builders::{
-            BasicBlock, BasicBlockId, Builder, ExpectBody, FunctionBodyKind, FunctionCFG,
-            InBlock, InModule, ValueId,
-        },
+        builders::{Builder, InBlock, InModule},
         errors::{SemanticError, SemanticErrorKind},
-        instructions::Terminator,
-        types::{
-            checked_declaration::{CheckedDeclaration, FunctionEffects, ParamMutation},
-            checked_type::{LiteralType, SpannedType, Type},
+        instructions::{
+            BasicBlockId, FunctionCFG, InstrId, InstructionKind, MakeLiteralKind,
+            MemoryId,
         },
-        utils::{facts::narrowed_type::NarrowedTypeFact, place::Place, scope::ScopeKind},
+        utils::scope::ScopeKind,
     },
 };
 
 impl<'a> Builder<'a, InModule> {
-    pub fn build_fn_body(
-        &mut self,
-        fn_decl: FnDecl,
-        substitutions: &GenericSubstitutions,
-    ) -> Result<(), SemanticError> {
+    pub fn build_fn_body(&mut self, fn_decl: FnDecl) -> Result<(), SemanticError> {
         let is_valid_scope = match self.current_scope.kind() {
             ScopeKind::File => true,
             ScopeKind::GenericParams => self
@@ -41,66 +32,35 @@ impl<'a> Builder<'a, InModule> {
             });
         }
 
-        let FnDecl {
-            id: decl_id,
-            identifier,
-            body,
-            ..
-        } = fn_decl;
+        let decl_id = fn_decl.id;
+        let raw_name = STRING_INTERNER.resolve(fn_decl.identifier.name);
 
-        let raw_name = STRING_INTERNER.resolve(identifier.name);
         if raw_name == "main" {
             if let Some(entry_path) = &self.program.entry_path {
                 if self.context.path != *entry_path {
                     return Err(SemanticError {
                         kind: SemanticErrorKind::MainFunctionMustBeInEntryFile,
-                        span: identifier.span.clone(),
+                        span: fn_decl.identifier.span.clone(),
                     });
                 }
             }
-
-            let func = match self.program.declarations.get(&decl_id) {
-                Some(CheckedDeclaration::Function(f)) => f,
-                _ => panic!("INTERNAL COMPILER ERROR: Function declaration not found"),
-            };
-
-            if !func.params.is_empty() {
+            if !fn_decl.params.is_empty() {
                 return Err(SemanticError {
                     kind: SemanticErrorKind::MainFunctionCannotHaveParameters,
-                    span: identifier.span.clone(),
-                });
-            }
-
-            let return_type = self.types.resolve(func.return_type.id);
-            if !matches!(
-                return_type,
-                Type::Literal(LiteralType::Void | LiteralType::I32(_)) | Type::I32
-            ) {
-                return Err(SemanticError {
-                    kind: SemanticErrorKind::MainFunctionInvalidReturnType,
-                    span: identifier.span.clone(),
+                    span: fn_decl.identifier.span.clone(),
                 });
             }
         }
+
+        let cfg = FunctionCFG::new();
+        self.program.cfgs.insert(decl_id, cfg);
+
+        let mut current_def = BTreeMap::new();
+        let mut incomplete_phis = BTreeMap::new();
+        let mut current_memory_def = BTreeMap::new();
+        let mut incomplete_memory_phis = BTreeMap::new();
 
         let entry_block_id = BasicBlockId(0);
-
-        if let Some(CheckedDeclaration::Function(func)) =
-            self.program.declarations.get_mut(&decl_id)
-        {
-            let cfg = FunctionCFG {
-                entry_block: entry_block_id,
-                next_block_id: 1,
-                next_value_id: 0,
-                blocks: BTreeMap::new(),
-                values: BTreeMap::new(),
-                effects: FunctionEffects::default(),
-            };
-            func.body = FunctionBodyKind::Internal(cfg);
-        } else {
-            panic!("INTERNAL COMPILER ERROR: Function declaration not found");
-        }
-
         let mut fn_builder = Builder {
             context: InBlock {
                 path: self.context.path.clone(),
@@ -111,157 +71,65 @@ impl<'a> Builder<'a, InModule> {
             errors: self.errors,
             current_scope: self
                 .current_scope
-                .enter(ScopeKind::FunctionBody, body.span.start),
-            condition_facts: self.condition_facts,
-            current_facts: self.current_facts,
-            incomplete_fact_merges: self.incomplete_fact_merges,
-            aliases: self.aliases,
-            types: self.types,
-            own_declarations: self.own_declarations,
+                .enter(ScopeKind::FunctionBody, fn_decl.body.span.start),
+
+            current_def: &mut current_def,
+            incomplete_phis: &mut incomplete_phis,
+            current_memory_def: &mut current_memory_def,
+            incomplete_memory_phis: &mut incomplete_memory_phis,
         };
 
-        let entry_bb = BasicBlock {
-            id: entry_block_id,
-            instructions: vec![],
-            terminator: None,
-            predecessors: HashSet::new(),
-            sealed: true,
-        };
+        fn_builder.write_memory(entry_block_id, MemoryId(0));
 
-        fn_builder
-            .get_fn_mut()
-            .expect_body()
-            .blocks
-            .insert(entry_block_id, entry_bb);
-
-        let param_count = fn_builder.get_fn().params.len();
-
-        for i in 0..param_count {
-            let (param_ty, param_ident) = {
-                let p = &fn_builder.get_fn().params[i];
-                (p.ty.clone(), p.identifier.clone())
-            };
-
-            let val_id = fn_builder.new_value_id(param_ty.id);
-            let param_decl_id = next_declaration_id();
-
-            fn_builder.declare_variable(
-                param_decl_id,
-                param_ident,
-                param_ty.id,
-                val_id,
-                param_ty.span,
-                None,
+        for (i, param) in fn_decl.params.iter().enumerate() {
+            let instr_id = fn_builder.push_instruction(
+                InstructionKind::Param(i),
+                param.identifier.span.clone(),
             );
 
-            let param = &mut fn_builder.get_fn_mut().params[i];
-            param.decl_id = Some(param_decl_id);
-            param.value_id = Some(val_id);
+            fn_builder.write_variable(entry_block_id, param.id, instr_id);
+
+            fn_builder
+                .program
+                .declarations
+                .insert(param.id, Declaration::Param(param.clone()));
+            fn_builder
+                .current_scope
+                .map_name_to_symbol(param.identifier.name, param.id);
         }
 
-        let return_type = fn_builder.get_fn().return_type.clone();
-
-        let (final_value, _) =
-            fn_builder.build_codeblock_expr(body, Some(&return_type), substitutions);
+        let (final_value, _) = fn_builder.build_codeblock_expr(fn_decl.body);
 
         if fn_builder.bb().terminator.is_none() {
             fn_builder.emit_return(final_value);
         }
 
-        let effects = fn_builder.compute_effects(&identifier.span);
-
-        fn_builder.get_fn_mut().expect_body().effects = effects;
+        fn_builder.seal_block(entry_block_id);
 
         Ok(())
     }
 }
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_fn_expr(
-        &mut self,
-        fn_decl: FnDecl,
-        expected_type: Option<&SpannedType>,
-        substitutions: &GenericSubstitutions,
-    ) -> ValueId {
+    pub fn build_fn_expr(&mut self, fn_decl: FnDecl) -> InstrId {
         let id = fn_decl.id;
         let span = fn_decl.identifier.span.clone();
 
         if !fn_decl.generic_params.is_empty() {
-            return self.report_error_and_get_poison(SemanticError {
+            self.errors.push(SemanticError {
                 span: span.clone(),
                 kind: SemanticErrorKind::GenericClosuresNotSupported,
             });
-        }
-
-        match self.as_module().build_fn_body(fn_decl, substitutions) {
-            Ok(_) => {}
-            Err(e) => self.errors.push(e),
-        };
-
-        let result = self.emit_const_fn(id);
-        self.check_expected(result, span, expected_type)
-    }
-
-    fn compute_effects(&mut self, _fn_span: &Span) -> FunctionEffects {
-        let func = self.get_fn();
-
-        let return_block_ids: Vec<_> = func
-            .expect_body()
-            .blocks
-            .iter()
-            .filter_map(|(id, bb)| {
-                if matches!(bb.terminator, Some(Terminator::Return { .. })) {
-                    Some(*id)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if return_block_ids.is_empty() {
-            return FunctionEffects::default();
-        }
-
-        let params: Vec<_> = func.params.clone();
-        let mut mutations = Vec::new();
-
-        for (i, param) in params.iter().enumerate() {
-            let declared_type_id = param.ty.id;
-
-            let param_decl_id = param.decl_id.expect(
-                "INTERNAL COMPILER ERROR: Param decl_id not set during effect \
-                 computation",
+            return self.push_instruction(
+                InstructionKind::MakeLiteral(MakeLiteralKind::Unknown),
+                span,
             );
-
-            let mut exit_types = Vec::new();
-            let mut any_changed = false;
-
-            for &block_id in &return_block_ids {
-                let place = Place::Var(param_decl_id);
-                let facts = self.read_fact_from_block(block_id, &place);
-
-                let ty = if let Some(narrowed) = facts.get::<NarrowedTypeFact>() {
-                    self.types.make_union(narrowed.variants.iter().copied())
-                } else {
-                    declared_type_id
-                };
-
-                if ty != declared_type_id {
-                    any_changed = true;
-                }
-
-                exit_types.push(ty);
-            }
-
-            if any_changed {
-                let exit_type = self.types.make_union(exit_types);
-                mutations.push(ParamMutation {
-                    param_index: i,
-                    exit_type,
-                });
-            }
         }
 
-        FunctionEffects { mutations }
+        if let Err(e) = self.as_module().build_fn_body(fn_decl) {
+            self.errors.push(e);
+        }
+
+        self.push_instruction(InstructionKind::MakeLiteral(MakeLiteralKind::Fn(id)), span)
     }
 }

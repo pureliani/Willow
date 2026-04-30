@@ -471,9 +471,7 @@ impl TypeInterner {
                 }
                 LiteralType::Fn(declaration_id) => format!("fn{}", declaration_id.0),
             },
-            Type::IndirectFn(fn_type) => {
-                self.fn_signature_to_string(&fn_type, visited_set)
-            }
+            Type::Fn(fn_type) => self.fn_signature_to_string(&fn_type, visited_set),
             Type::Pointer(to) => {
                 format!("ptr<{}>", self.to_string_recursive(to, visited_set))
             }

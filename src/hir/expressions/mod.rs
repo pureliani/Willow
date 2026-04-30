@@ -15,7 +15,7 @@ pub mod string;
 pub mod struct_init;
 pub mod template;
 pub mod typecast;
-pub mod unary_op;
+pub mod unary;
 
 use crate::{
     ast::expr::{Expr, ExprKind},
@@ -93,9 +93,11 @@ impl<'a> Builder<'a, InBlock> {
                 self.build_identifier_expr(identifier_node)
             }
             ExprKind::TypeCast { left, target } => {
-                self.build_typecast_expr(*left, target)
+                self.build_typecast_expr(*left, target, expr.span)
             }
-            ExprKind::IsType { left, ty } => self.build_is_type_expr(*left, ty),
+            ExprKind::IsType { left, ty } => {
+                self.build_is_type_expr(*left, ty, expr.span)
+            }
             ExprKind::Null => self.emit_null(expr.span),
             ExprKind::TemplateString(parts) => self.build_template_expr(parts, span),
             ExprKind::GenericApply { left, type_args } => {

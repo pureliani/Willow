@@ -10,16 +10,14 @@ use crate::{
 impl<'a> Builder<'a, InBlock> {
     pub fn build_static_access_expr(
         &mut self,
-        left: Expr,
+        _left: Expr,
         field: IdentifierNode,
     ) -> InstrId {
         let span = field.span.clone();
 
-        let result = self.report_error_and_get_poison(SemanticError {
-            kind: SemanticErrorKind::CannotStaticAccess(left_type),
+        self.report_error_and_get_poison(SemanticError {
+            kind: SemanticErrorKind::CannotStaticAccess,
             span: span.clone(),
-        });
-
-        result
+        })
     }
 }

@@ -1,10 +1,7 @@
 use crate::{
     compile::interner::TypeInterner,
     globals::STRING_INTERNER,
-    hir::types::{
-        checked_declaration::CheckedParam,
-        checked_type::{FnTypeKind, StructKind, Type},
-    },
+    hir::types::checked_type::{CheckedParam, FnTypeKind, StructKind, Type},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

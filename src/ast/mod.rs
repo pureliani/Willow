@@ -101,13 +101,3 @@ impl Span {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DeclarationId(pub usize);
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct GenericDeclarationId(pub usize);
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum SymbolId {
-    Concrete(DeclarationId),
-    Generic(GenericDeclarationId),
-    GenericParameter(StringId),
-}

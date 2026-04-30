@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::LazyLock;
 
-use crate::ast::{DeclarationId, GenericDeclarationId};
+use crate::ast::DeclarationId;
 use crate::compile::interner::{StringId, StringInterner};
 
 pub struct CommonIdentifiers {
@@ -31,10 +31,6 @@ pub static COMMON_IDENTIFIERS: LazyLock<CommonIdentifiers> =
 
 pub fn next_declaration_id() -> DeclarationId {
     DeclarationId(DECLARATION_COUNTER.fetch_add(1, Ordering::SeqCst))
-}
-
-pub fn next_generic_declaration_id() -> GenericDeclarationId {
-    GenericDeclarationId(GENERIC_DECLARATION_COUNTER.fetch_add(1, Ordering::SeqCst))
 }
 
 pub fn reset_globals() {

@@ -4,18 +4,10 @@ use std::{
 };
 
 use crate::{
-    ast::{
-        type_annotation::TypeAnnotation, DeclarationId, GenericDeclarationId,
-        IdentifierNode, ModulePath,
-    },
-    compile::interner::TypeId,
+    ast::{decl::Declaration, DeclarationId, ModulePath},
     hir::{
         errors::SemanticError,
         instructions::{BasicBlockId, FunctionCFG, InstrId, MemoryId},
-        types::{
-            checked_declaration::{CheckedDeclaration, GenericDeclaration},
-            checked_type::SpannedType,
-        },
         utils::scope::Scope,
     },
 };
@@ -30,68 +22,17 @@ pub mod std_lib;
 
 pub struct Program {
     pub modules: BTreeMap<ModulePath, Module>,
-    pub declarations: BTreeMap<DeclarationId, CheckedDeclaration>,
-    pub generic_declarations: BTreeMap<GenericDeclarationId, GenericDeclaration>,
-
+    pub declarations: BTreeMap<DeclarationId, Declaration>,
+    pub cfgs: BTreeMap<DeclarationId, FunctionCFG>,
     pub entry_path: Option<ModulePath>,
     pub target_ptr_size: usize,
     pub target_ptr_align: usize,
     pub foreign_links: HashSet<PathBuf>,
-
-    pub monomorphizations: BTreeMap<(GenericDeclarationId, Vec<TypeId>), DeclarationId>,
 }
 
 pub struct Module {
     pub path: ModulePath,
     pub root_scope: Scope,
-}
-
-#[derive(Debug, Clone)]
-pub struct FunctionParam {
-    pub identifier: IdentifierNode,
-    pub ty: TypeAnnotation,
-}
-
-#[derive(Debug, Clone)]
-pub enum FunctionBodyKind {
-    Internal(FunctionCFG),
-    External,
-    NotBuilt,
-}
-
-#[derive(Debug, Clone)]
-pub struct CheckedFunctionDecl {
-    pub id: DeclarationId,
-    pub identifier: IdentifierNode,
-    pub params: Vec<FunctionParam>,
-    pub return_type: SpannedType,
-    pub is_exported: bool,
-    pub body: FunctionBodyKind,
-}
-
-pub trait ExpectBody {
-    type Output;
-    fn expect_body(self) -> Self::Output;
-}
-
-impl<'a> ExpectBody for &'a CheckedFunctionDecl {
-    type Output = &'a FunctionCFG;
-    fn expect_body(self) -> Self::Output {
-        match &self.body {
-            FunctionBodyKind::Internal(cfg) => cfg,
-            _ => panic!("INTERNAL COMPILER ERROR: Expected internal function"),
-        }
-    }
-}
-
-impl<'a> ExpectBody for &'a mut CheckedFunctionDecl {
-    type Output = &'a mut FunctionCFG;
-    fn expect_body(self) -> Self::Output {
-        match &mut self.body {
-            FunctionBodyKind::Internal(cfg) => cfg,
-            _ => panic!("INTERNAL COMPILER ERROR: Expected internal function"),
-        }
-    }
 }
 
 pub trait BuilderContext {}
@@ -107,9 +48,6 @@ pub struct Builder<'a, C: BuilderContext> {
 
     pub current_memory_def: &'a mut BTreeMap<BasicBlockId, MemoryId>,
     pub incomplete_memory_phis: &'a mut BTreeMap<BasicBlockId, MemoryId>,
-
-    // Tracks declarations created by this specific builder
-    pub own_declarations: &'a mut HashSet<DeclarationId>,
 }
 
 pub struct InGlobal;

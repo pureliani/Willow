@@ -1,10 +1,9 @@
 use crate::{
-    ast::{IdentifierNode, SymbolId},
+    ast::{decl::Declaration, IdentifierNode},
     hir::{
         builders::{Builder, InBlock},
         errors::{SemanticError, SemanticErrorKind},
-        instructions::InstrId,
-        types::checked_declaration::{CheckedDeclaration, GenericDeclaration},
+        instructions::{InstrId, InstructionKind, MakeLiteralKind},
     },
 };
 
@@ -12,67 +11,31 @@ impl<'a> Builder<'a, InBlock> {
     pub fn build_identifier_expr(&mut self, identifier: IdentifierNode) -> InstrId {
         let span = identifier.span.clone();
 
-        let symbol_id = match self.current_scope.lookup(identifier.name) {
+        let decl_id = match self.current_scope.lookup(identifier.name) {
             Some(id) => id,
             None => {
                 return self.report_error_and_get_poison(SemanticError {
-                    span: identifier.span.clone(),
+                    span: span.clone(),
                     kind: SemanticErrorKind::UndeclaredIdentifier(identifier),
                 });
             }
         };
 
-        match symbol_id {
-            SymbolId::GenericParameter(_) => {
-                self.report_error_and_get_poison(SemanticError {
-                    span: identifier.span.clone(),
+        let decl = self.program.declarations.get(&decl_id).unwrap();
+
+        match decl {
+            Declaration::Fn(_) => self.push_instruction(
+                InstructionKind::MakeLiteral(MakeLiteralKind::Fn(decl_id)),
+                span,
+            ),
+            Declaration::Var(_) | Declaration::Param(_) => {
+                self.read_variable(self.context.block_id, decl_id)
+            }
+            Declaration::TypeAlias(_) | Declaration::GenericParameter(_) => self
+                .report_error_and_get_poison(SemanticError {
+                    span: span.clone(),
                     kind: SemanticErrorKind::CannotUseTypeDeclarationAsValue,
-                })
-            }
-            SymbolId::Concrete(decl_id) => {
-                let decl = self.program.declarations.get(&decl_id).unwrap();
-
-                let result = match decl {
-                    CheckedDeclaration::Function(_) => self.emit_const_fn(decl_id),
-                    CheckedDeclaration::Var(_) => {
-                        let place = self
-                            .aliases
-                            .get(&decl_id)
-                            .cloned()
-                            .unwrap_or(Place::Var(decl_id));
-
-                        self.read_place(&place)
-                    }
-                    CheckedDeclaration::TypeAlias(_) => {
-                        self.report_error_and_get_poison(SemanticError {
-                            span: identifier.span.clone(),
-                            kind: SemanticErrorKind::CannotUseTypeDeclarationAsValue,
-                        })
-                    }
-                };
-
-                self.check_expected(result, span, expected_type)
-            }
-            SymbolId::Generic(gen_id) => {
-                let generic_decl =
-                    self.program.generic_declarations.get(&gen_id).unwrap();
-
-                let error_kind = match generic_decl {
-                    GenericDeclaration::Function { .. } => {
-                        SemanticErrorKind::MissingGenericArguments
-                    }
-                    GenericDeclaration::TypeAlias { .. } => {
-                        SemanticErrorKind::CannotUseTypeDeclarationAsValue
-                    }
-                };
-
-                let result = self.report_error_and_get_poison(SemanticError {
-                    span: identifier.span.clone(),
-                    kind: error_kind,
-                });
-
-                self.check_expected(result, span, expected_type)
-            }
+                }),
         }
     }
 }

@@ -27,7 +27,7 @@ use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 use std::collections::BTreeMap;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -220,11 +220,6 @@ impl Compiler {
         let target_ptr_align = target_data.get_abi_alignment(&ptr_type) as usize;
 
         let mut builder_errors = vec![];
-        let mut current_facts = HashMap::new();
-        let mut incomplete_fact_merges = HashMap::new();
-        let mut condition_facts = HashMap::new();
-        let mut aliases = HashMap::new();
-        let mut own_declarations = HashSet::new();
 
         let mut program = Program {
             entry_path: Some(canonical_main.clone()),
@@ -233,23 +228,25 @@ impl Compiler {
             foreign_links: HashSet::new(),
             target_ptr_size,
             target_ptr_align,
-            generic_declarations: BTreeMap::new(),
-            monomorphizations: BTreeMap::new(),
+            cfgs: BTreeMap::new(),
         };
 
         let global_scope = Scope::new_root(ScopeKind::Global, Span::default());
+
+        let mut current_def = BTreeMap::new();
+        let mut incomplete_phis = BTreeMap::new();
+        let mut current_memory_def = BTreeMap::new();
+        let mut incomplete_memory_phis = BTreeMap::new();
 
         let mut program_builder = Builder {
             context: InGlobal,
             current_scope: global_scope,
             errors: &mut builder_errors,
             program: &mut program,
-            current_facts: &mut current_facts,
-            incomplete_fact_merges: &mut incomplete_fact_merges,
-            condition_facts: &mut condition_facts,
-            aliases: &mut aliases,
-            types: &self.types,
-            own_declarations: &mut own_declarations,
+            current_def: &mut current_def,
+            incomplete_phis: &mut incomplete_phis,
+            current_memory_def: &mut current_memory_def,
+            incomplete_memory_phis: &mut incomplete_memory_phis,
         };
 
         program_builder.build(modules_to_compile);

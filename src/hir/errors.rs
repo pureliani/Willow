@@ -59,7 +59,7 @@ pub enum SemanticErrorKind {
         received: TypeId,
     },
     CannotAccess(TypeId),
-    CannotStaticAccess(TypeId),
+    CannotStaticAccess,
     AccessToUndefinedField(IdentifierNode),
     AccessToUndefinedStaticField(IdentifierNode),
     FnArgumentCountMismatch {
@@ -145,7 +145,7 @@ impl SemanticErrorKind {
             SemanticErrorKind::IfExpressionMissingElse => SemanticErrorSeverity::Error,
             SemanticErrorKind::CannotCastType { .. } => SemanticErrorSeverity::Error,
             SemanticErrorKind::CannotIndex { .. } => SemanticErrorSeverity::Error,
-            SemanticErrorKind::CannotStaticAccess { .. } => SemanticErrorSeverity::Error,
+            SemanticErrorKind::CannotStaticAccess => SemanticErrorSeverity::Error,
             SemanticErrorKind::AccessToUndefinedStaticField { .. } => {
                 SemanticErrorSeverity::Error
             }
@@ -226,7 +226,7 @@ impl SemanticErrorKind {
             SemanticErrorKind::IfExpressionMissingElse => 23,
             SemanticErrorKind::CannotCastType { .. } => 24,
             SemanticErrorKind::CannotIndex { .. } => 25,
-            SemanticErrorKind::CannotStaticAccess { .. } => 26,
+            SemanticErrorKind::CannotStaticAccess => 26,
             SemanticErrorKind::AccessToUndefinedStaticField { .. } => 27,
             SemanticErrorKind::CannotUseTypeDeclarationAsValue => 28,
             SemanticErrorKind::CannotDeclareGlobalVariable => 29,

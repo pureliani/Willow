@@ -2,15 +2,12 @@ use crate::{
     compile::interner::TypeInterner,
     globals::STRING_INTERNER,
     hir::{
-        builders::{
-            BasicBlockId, CheckedFunctionDecl, ExpectBody, FunctionBodyKind, FunctionCFG,
-            Program, ValueId,
-        },
+        builders::Program,
         instructions::{
-            BinaryInstr, CallInstr, CastInstr, CompInstr, InstructionKind, MemoryInstr,
-            SelectInstr, Terminator, UnaryInstr,
+            BinaryInstr, CallInstr, CastInstr, InstructionKind, MemoryInstr, SelectInstr,
+            Terminator, UnaryInstr,
         },
-        types::{checked_declaration::CheckedDeclaration, checked_type::Type},
+        types::checked_type::Type,
     },
 };
 use std::fmt::Write;

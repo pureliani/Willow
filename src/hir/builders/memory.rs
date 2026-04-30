@@ -1,8 +1,8 @@
 use crate::{
-    ast::{type_annotation::TypeAnnotation, IdentifierNode, Span},
+    ast::{type_annotation::TypeAnnotation, Span},
     hir::{
-        builders::{Builder, ExpectBody, InBlock},
-        instructions::{InstrId, InstructionKind, MemoryInstr},
+        builders::{Builder, InBlock},
+        instructions::{InstrId, InstructionKind, MemoryInstr, Place},
     },
 };
 
@@ -33,7 +33,7 @@ impl<'a> Builder<'a, InBlock> {
 
     pub fn emit_heap_free(&mut self, ptr: InstrId, span: Span) -> InstrId {
         let memory_in = self.read_memory(self.context.block_id);
-        let memory_out = self.get_fn_mut().expect_body().new_memory_id();
+        let memory_out = self.cfg_mut().new_memory_id();
         self.write_memory(self.context.block_id, memory_out);
 
         self.push_instruction(
@@ -46,34 +46,9 @@ impl<'a> Builder<'a, InBlock> {
         )
     }
 
-    pub fn emit_load(&mut self, ptr: InstrId, span: Span) -> InstrId {
-        let memory_in = self.read_memory(self.context.block_id);
-
-        self.push_instruction(
-            InstructionKind::Memory(MemoryInstr::Load { ptr, memory_in }),
-            span,
-        )
-    }
-
-    pub fn emit_store(&mut self, ptr: InstrId, value: InstrId, span: Span) -> InstrId {
-        let memory_in = self.read_memory(self.context.block_id);
-        let memory_out = self.get_fn_mut().expect_body().new_memory_id();
-        self.write_memory(self.context.block_id, memory_out);
-
-        self.push_instruction(
-            InstructionKind::Memory(MemoryInstr::Store {
-                ptr,
-                value,
-                memory_in,
-                memory_out,
-            }),
-            span,
-        )
-    }
-
     pub fn emit_memcopy(&mut self, from: InstrId, to: InstrId, span: Span) -> InstrId {
         let memory_in = self.read_memory(self.context.block_id);
-        let memory_out = self.get_fn_mut().expect_body().new_memory_id();
+        let memory_out = self.cfg_mut().new_memory_id();
         self.write_memory(self.context.block_id, memory_out);
 
         self.push_instruction(
@@ -87,16 +62,31 @@ impl<'a> Builder<'a, InBlock> {
         )
     }
 
-    pub fn emit_get_field_ptr(
+    pub fn emit_read_place(&mut self, place: Place, span: Span) -> InstrId {
+        let memory_in = self.read_memory(self.context.block_id);
+
+        self.push_instruction(
+            InstructionKind::Memory(MemoryInstr::ReadPlace { place, memory_in }),
+            span,
+        )
+    }
+
+    pub fn emit_write_place(
         &mut self,
-        base_ptr: InstrId,
-        field_name: IdentifierNode,
+        place: Place,
+        value: InstrId,
         span: Span,
     ) -> InstrId {
+        let memory_in = self.read_memory(self.context.block_id);
+        let memory_out = self.cfg_mut().new_memory_id();
+        self.write_memory(self.context.block_id, memory_out);
+
         self.push_instruction(
-            InstructionKind::Memory(MemoryInstr::GetFieldPtr {
-                base_ptr,
-                field_name,
+            InstructionKind::Memory(MemoryInstr::WritePlace {
+                place,
+                value,
+                memory_in,
+                memory_out,
             }),
             span,
         )

@@ -2,12 +2,36 @@ use crate::{
     ast::{DeclarationId, IdentifierNode, Span},
     compile::interner::{StringId, TypeId, TypeInterner},
     globals::COMMON_IDENTIFIERS,
-    hir::types::{
-        checked_declaration::{CheckedParam, FnType},
-        ordered_float::{OrderedF32, OrderedF64},
-    },
+    hir::types::ordered_float::{OrderedF32, OrderedF64},
 };
 use std::{cmp::Ordering, collections::BTreeSet, hash::Hash};
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CheckedParam {
+    pub identifier: IdentifierNode,
+    pub ty: SpannedType,
+}
+
+impl Ord for CheckedParam {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.ty.cmp(&other.ty) {
+            Ordering::Equal => self.identifier.cmp(&other.identifier),
+            other_order => other_order,
+        }
+    }
+}
+
+impl PartialOrd for CheckedParam {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FnType {
+    pub params: Vec<CheckedParam>,
+    pub return_type: SpannedType,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum StructKind {

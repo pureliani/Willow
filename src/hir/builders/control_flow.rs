@@ -1,7 +1,7 @@
 use crate::{
     ast::Span,
     hir::{
-        builders::{BasicBlockId, Builder, ExpectBody, InBlock},
+        builders::{BasicBlockId, Builder, InBlock},
         instructions::{
             CallInstr, InstrDefinition, InstrId, InstructionKind, MakeLiteralKind,
             PhiInstr, PhiSource, Terminator,
@@ -13,12 +13,12 @@ impl<'a> Builder<'a, InBlock> {
     pub fn push_instruction(&mut self, kind: InstructionKind, span: Span) -> InstrId {
         let block = self.context.block_id;
         let def = InstrDefinition { kind, block, span };
-        self.get_fn_mut().expect_body().push_instruction(def)
+        self.cfg_mut().push_instruction(def)
     }
 
     pub fn check_no_terminator(&self) {
         let block = self.context.block_id;
-        self.get_fn().expect_body().check_no_terminator(block);
+        self.cfg().check_no_terminator(block);
     }
 
     pub fn emit_call(
@@ -28,7 +28,7 @@ impl<'a> Builder<'a, InBlock> {
         span: Span,
     ) -> InstrId {
         let memory_in = self.read_memory(self.context.block_id);
-        let memory_out = self.get_fn_mut().expect_body().new_memory_id();
+        let memory_out = self.cfg_mut().new_memory_id();
         self.write_memory(self.context.block_id, memory_out);
 
         self.push_instruction(

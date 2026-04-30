@@ -508,7 +508,7 @@ impl Compiler {
                                     "Cannot use the access operator on the type `{}`",
                                     self.types.to_string(*target)
                                 ))]),
-                        SemanticErrorKind::CannotStaticAccess(_) => diag
+                        SemanticErrorKind::CannotStaticAccess => diag
                             .with_message("Cannot access static field")
                             .with_labels(vec![Label::primary(file_id, range)
                                 .with_message("Invalid static access")]),

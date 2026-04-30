@@ -1,10 +1,9 @@
 use crate::{
-    ast::{DeclarationId, Span},
+    ast::{decl::Declaration, DeclarationId, Span},
     compile::interner::StringId,
     hir::{
         builders::{Builder, InBlock},
         instructions::{InstrId, InstructionKind, MakeLiteralKind},
-        types::checked_declaration::CheckedDeclaration,
     },
     tokenize::NumberKind,
 };
@@ -46,7 +45,7 @@ impl<'a> Builder<'a, InBlock> {
             .get(&decl_id)
             .expect("INTERNAL COMPILER ERROR: Function declaration not found");
 
-        if !matches!(decl, CheckedDeclaration::Function(_)) {
+        if !matches!(decl, Declaration::Fn(_)) {
             panic!("INTERNAL COMPILER ERROR: Declaration is not a function");
         }
 

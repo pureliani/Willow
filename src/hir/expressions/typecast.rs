@@ -1,10 +1,8 @@
 use crate::{
-    ast::{expr::Expr, type_annotation::TypeAnnotation},
-    compile::interner::GenericSubstitutions,
+    ast::{expr::Expr, type_annotation::TypeAnnotation, Span},
     hir::{
-        builders::{Builder, InBlock, ValueId},
-        errors::{SemanticError, SemanticErrorKind},
-        types::checked_type::SpannedType,
+        builders::{Builder, InBlock},
+        instructions::{CastInstr, InstrId, InstructionKind},
     },
 };
 
@@ -13,32 +11,9 @@ impl<'a> Builder<'a, InBlock> {
         &mut self,
         left: Expr,
         target: TypeAnnotation,
-        expected_type: Option<&SpannedType>,
-        substitutions: &GenericSubstitutions,
-    ) -> ValueId {
-        let source_span = left.span.clone();
-        let source = self.build_expr(left, None, substitutions);
-        let source_type = self.get_value_type(source);
-
-        let target_type = self.check_type_annotation(&target, substitutions);
-
-        let adjusted_val =
-            match self.compute_type_adjustment(source_type, target_type.id, true) {
-                Err(_) => self.report_error_and_get_poison(SemanticError {
-                    kind: SemanticErrorKind::CannotCastType {
-                        source_type,
-                        target_type: target_type.id,
-                    },
-                    span: source_span.clone(),
-                }),
-                Ok(adj) => self.apply_adjustment(
-                    source,
-                    adj,
-                    target_type.id,
-                    source_span.clone(),
-                ),
-            };
-
-        self.check_expected(adjusted_val, source_span, expected_type)
+        span: Span,
+    ) -> InstrId {
+        let src = self.build_expr(left);
+        self.push_instruction(InstructionKind::Cast(CastInstr { src, target }), span)
     }
 }

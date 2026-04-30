@@ -55,6 +55,14 @@ pub struct CastInstr {
     pub target: TypeAnnotation,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Place {
+    Var(DeclarationId),
+    Expr(InstrId),
+    Field(Box<Place>, IdentifierNode),
+    Deref(Box<Place>),
+}
+
 #[derive(Clone, Debug)]
 pub enum MemoryInstr {
     StackAlloc {
@@ -65,24 +73,9 @@ pub enum MemoryInstr {
         ty: TypeAnnotation,
         count: InstrId,
     },
-
-    GetFieldPtr {
-        base_ptr: InstrId,
-        field_name: IdentifierNode,
-    },
     PtrOffset {
         base_ptr: InstrId,
         index: InstrId,
-    },
-    Load {
-        ptr: InstrId,
-        memory_in: MemoryId,
-    },
-    Store {
-        ptr: InstrId,
-        value: InstrId,
-        memory_in: MemoryId,
-        memory_out: MemoryId,
     },
     HeapFree {
         ptr: InstrId,
@@ -92,6 +85,16 @@ pub enum MemoryInstr {
     MemCopy {
         from: InstrId,
         to: InstrId,
+        memory_in: MemoryId,
+        memory_out: MemoryId,
+    },
+    ReadPlace {
+        place: Place,
+        memory_in: MemoryId,
+    },
+    WritePlace {
+        place: Place,
+        value: InstrId,
         memory_in: MemoryId,
         memory_out: MemoryId,
     },
@@ -142,9 +145,26 @@ pub enum MakeLiteralKind {
 }
 
 #[derive(Clone, Debug)]
+pub struct StructInitInstr {
+    pub fields: Vec<(IdentifierNode, InstrId)>,
+    pub by_value: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ListInitInstr {
+    pub items: Vec<InstrId>,
+}
+
+#[derive(Clone, Debug)]
 pub struct IsTypeInstr {
     pub src: InstrId,
     pub target: TypeAnnotation,
+}
+
+#[derive(Clone, Debug)]
+pub struct GenericApplyInstr {
+    pub func: InstrId,
+    pub type_args: Vec<TypeAnnotation>,
 }
 
 #[derive(Clone, Debug)]
@@ -159,6 +179,9 @@ pub enum InstructionKind {
     Phi(PhiInstr),
     IsType(IsTypeInstr),
     Param(usize),
+    StructInit(StructInitInstr),
+    ListInit(ListInitInstr),
+    GenericApply(GenericApplyInstr),
 }
 
 #[derive(Clone, Debug)]

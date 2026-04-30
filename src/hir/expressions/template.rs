@@ -1,19 +1,13 @@
 use crate::{
     ast::{expr::Expr, Span},
     hir::{
-        builders::{Builder, InBlock, ValueId},
-        types::checked_type::{SpannedType, StructKind, Type},
+        builders::{Builder, InBlock},
+        instructions::InstrId,
     },
-    tokenize::NumberKind,
 };
 
 impl<'a> Builder<'a, InBlock> {
-    pub fn build_template_expr(
-        &mut self,
-        parts: Vec<Expr>,
-        span: Span,
-        expected_type: Option<&SpannedType>,
-    ) -> ValueId {
+    pub fn build_template_expr(&mut self, parts: Vec<Expr>, span: Span) -> InstrId {
         todo!()
     }
 }

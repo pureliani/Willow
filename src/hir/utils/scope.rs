@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    ast::{Position, Span, SymbolId},
+    ast::{DeclarationId, Position, Span},
     compile::interner::StringId,
     hir::instructions::BasicBlockId,
 };
@@ -32,7 +32,7 @@ pub enum ScopeKind {
 #[derive(Debug)]
 struct ScopeData {
     kind: ScopeKind,
-    symbols: HashMap<StringId, SymbolId>,
+    symbols: HashMap<StringId, DeclarationId>,
     parent: Option<Weak<RefCell<ScopeData>>>,
     children: Vec<Scope>,
     span: Span,
@@ -82,7 +82,7 @@ impl Scope {
         self.0.borrow().parent.as_ref()?.upgrade().map(Scope)
     }
 
-    pub fn lookup(&self, name: StringId) -> Option<SymbolId> {
+    pub fn lookup(&self, name: StringId) -> Option<DeclarationId> {
         if let Some(id) = self.0.borrow().symbols.get(&name) {
             return Some(*id);
         }
@@ -90,7 +90,7 @@ impl Scope {
         self.parent()?.lookup(name)
     }
 
-    pub fn map_name_to_symbol(&self, name: StringId, id: SymbolId) {
+    pub fn map_name_to_symbol(&self, name: StringId, id: DeclarationId) {
         let mut data = self.0.borrow_mut();
         if let Entry::Vacant(e) = data.symbols.entry(name) {
             e.insert(id);

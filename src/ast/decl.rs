@@ -1,5 +1,6 @@
 use crate::{
     ast::{expr::BlockContents, DeclarationId, IdentifierNode},
+    compile::interner::StringId,
     parse::DocAnnotation,
 };
 
@@ -13,6 +14,7 @@ pub struct GenericParam {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Param {
+    pub id: DeclarationId,
     pub identifier: IdentifierNode,
     pub constraint: TypeAnnotation,
 }
@@ -40,16 +42,19 @@ pub struct TypeAliasDecl {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Declaration {
-    TypeAlias(TypeAliasDecl),
-    Fn(FnDecl),
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct VarDecl {
     pub id: DeclarationId,
     pub documentation: Option<DocAnnotation>,
     pub identifier: IdentifierNode,
     pub constraint: Option<TypeAnnotation>,
     pub value: Expr,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Declaration {
+    TypeAlias(TypeAliasDecl),
+    Fn(FnDecl),
+    Var(VarDecl),
+    Param(Param),
+    GenericParameter(StringId),
 }

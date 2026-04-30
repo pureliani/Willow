@@ -95,7 +95,6 @@ impl<'a> Builder<'a, InGlobal> {
             program: self.program,
             errors: self.errors,
             current_scope: scope,
-            own_declarations: self.own_declarations,
         }
     }
 }
@@ -147,8 +146,6 @@ impl<'a> Builder<'a, InModule> {
         self.program
             .declarations
             .insert(decl_id, CheckedDeclaration::Function(function));
-
-        self.own_declarations.insert(decl_id);
 
         self.current_scope
             .map_name_to_symbol(decl_name, SymbolId::Concrete(decl_id));

@@ -1,11 +1,8 @@
 use crate::{
-    ast::{decl::FnDecl, stmt::ImportItem, ModulePath, Span, StringNode, SymbolId},
+    ast::{decl::FnDecl, stmt::ImportItem, ModulePath, Span, StringNode},
     hir::{
-        builders::{
-            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InModule,
-        },
+        builders::{Builder, InModule},
         errors::{SemanticError, SemanticErrorKind},
-        types::checked_declaration::{CheckedDeclaration, GenericDeclaration},
     },
 };
 use std::collections::HashMap;
@@ -167,8 +164,6 @@ impl<'a> Builder<'a, InModule> {
             .map(|p| FunctionParam {
                 identifier: p.identifier,
                 ty: p.ty,
-                decl_id: None,
-                value_id: None,
             })
             .collect();
 

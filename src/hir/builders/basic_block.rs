@@ -1,17 +1,16 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    ast::{DeclarationId, Span},
+    ast::{
+        decl::{Declaration, FnDecl},
+        DeclarationId, Span,
+    },
     hir::{
-        builders::{
-            BasicBlockId, Builder, CheckedFunctionDecl, ExpectBody, InBlock, InFunction,
-            InModule,
-        },
+        builders::{BasicBlockId, Builder, InBlock, InFunction, InModule},
         instructions::{
-            BasicBlock, InstrDefinition, InstrId, InstructionKind, MemoryId,
+            BasicBlock, FunctionCFG, InstrDefinition, InstrId, InstructionKind, MemoryId,
             MemoryPhiSource, PhiInstr, PhiSource,
         },
-        types::checked_declaration::CheckedDeclaration,
     },
 };
 
@@ -24,7 +23,6 @@ impl<'a> Builder<'a, InBlock> {
             program: self.program,
             errors: self.errors,
             current_scope: self.current_scope.clone(),
-            own_declarations: self.own_declarations,
             current_def: self.current_def,
             incomplete_phis: self.incomplete_phis,
             current_memory_def: self.current_memory_def,
@@ -41,7 +39,6 @@ impl<'a> Builder<'a, InBlock> {
             program: self.program,
             errors: self.errors,
             current_scope: self.current_scope.clone(),
-            own_declarations: self.own_declarations,
             current_def: self.current_def,
             incomplete_phis: self.incomplete_phis,
             current_memory_def: self.current_memory_def,
@@ -50,7 +47,15 @@ impl<'a> Builder<'a, InBlock> {
     }
 
     pub fn new_block(&mut self) -> BasicBlockId {
-        self.get_fn_mut().expect_body().new_block()
+        self.cfg_mut().new_block()
+    }
+
+    pub fn cfg(&self) -> &FunctionCFG {
+        self.program.cfgs.get(&self.context.func_id).unwrap()
+    }
+
+    pub fn cfg_mut(&mut self) -> &mut FunctionCFG {
+        self.program.cfgs.get_mut(&self.context.func_id).unwrap()
     }
 
     pub fn bb(&self) -> &BasicBlock {
@@ -64,34 +69,33 @@ impl<'a> Builder<'a, InBlock> {
     }
 
     pub fn get_bb(&self, block: BasicBlockId) -> &BasicBlock {
-        self.get_fn().expect_body().get_block(block)
+        self.cfg().get_block(block)
     }
 
     pub fn get_bb_mut(&mut self, block: BasicBlockId) -> &mut BasicBlock {
-        self.get_fn_mut().expect_body().get_block_mut(block)
+        self.cfg_mut().get_block_mut(block)
     }
 
-    pub fn get_fn(&self) -> &CheckedFunctionDecl {
+    pub fn get_fn(&self) -> &FnDecl {
         let func_id = self.context.func_id;
 
         match self.program.declarations.get(&func_id).unwrap() {
-            CheckedDeclaration::Function(f) => f,
+            Declaration::Fn(f) => f,
             _ => panic!("INTERNAL COMPILER ERROR: Declaration is not a function"),
         }
     }
 
-    pub fn get_fn_mut(&mut self) -> &mut CheckedFunctionDecl {
+    pub fn get_fn_mut(&mut self) -> &mut FnDecl {
         let func_id = self.context.func_id;
 
         match self.program.declarations.get_mut(&func_id).unwrap() {
-            CheckedDeclaration::Function(f) => f,
+            Declaration::Fn(f) => f,
             _ => panic!("INTERNAL COMPILER ERROR: Declaration is not a function"),
         }
     }
 
     pub fn get_instr_span(&self, id: InstrId) -> &Span {
-        let cfg = self.get_fn().expect_body();
-        &cfg.get_instr(id).span
+        &self.cfg().get_instr(id).span
     }
 
     pub fn use_basic_block(&mut self, block_id: BasicBlockId) {
@@ -140,7 +144,7 @@ impl<'a> Builder<'a, InBlock> {
             });
         }
 
-        let instr_def = self.get_fn_mut().expect_body().get_instr_mut(phi_instr_id);
+        let instr_def = self.cfg_mut().get_instr_mut(phi_instr_id);
         if let InstructionKind::Phi(phi) = &mut instr_def.kind {
             phi.sources = sources;
         } else {
@@ -204,7 +208,7 @@ impl<'a> Builder<'a, InBlock> {
     }
 
     fn emit_incomplete_phi(&mut self, block: BasicBlockId) -> InstrId {
-        let cfg = self.get_fn_mut().expect_body();
+        let cfg = self.cfg_mut();
         let id = InstrId(cfg.instructions.len());
 
         let instr = InstrDefinition {
@@ -250,7 +254,7 @@ impl<'a> Builder<'a, InBlock> {
         let is_sealed = self.get_bb(block).sealed;
 
         if !is_sealed {
-            let phi_id = self.get_fn_mut().expect_body().new_memory_id();
+            let phi_id = self.cfg_mut().new_memory_id();
             self.incomplete_memory_phis.insert(block, phi_id);
             self.write_memory(block, phi_id);
             return phi_id;
@@ -265,7 +269,7 @@ impl<'a> Builder<'a, InBlock> {
             return mem;
         }
 
-        let phi_id = self.get_fn_mut().expect_body().new_memory_id();
+        let phi_id = self.cfg_mut().new_memory_id();
         self.write_memory(block, phi_id);
         self.add_memory_phi_operands(block, phi_id);
 
@@ -284,8 +288,7 @@ impl<'a> Builder<'a, InBlock> {
             });
         }
 
-        self.get_fn_mut()
-            .expect_body()
+        self.cfg_mut()
             .get_block_mut(block)
             .memory_phis
             .insert(phi_id, sources);
