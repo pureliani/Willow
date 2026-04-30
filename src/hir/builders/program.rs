@@ -1,20 +1,9 @@
-use std::collections::HashMap;
-
 use crate::{
-    ast::{
-        decl::{Declaration, FnDecl},
-        expr::ExprKind,
-        stmt::StmtKind,
-        ModulePath, Position, SymbolId,
-    },
+    ast::{decl::Declaration, expr::ExprKind, stmt::StmtKind, ModulePath, Position},
     compile::ParallelParseResult,
-    globals::next_generic_declaration_id,
     hir::{
-        builders::{
-            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam,
-            GenericDeclaration, InGlobal, InModule, Module,
-        },
-        types::checked_declaration::CheckedDeclaration,
+        builders::{Builder, InGlobal, InModule, Module},
+        errors::{SemanticError, SemanticErrorKind},
         utils::scope::ScopeKind,
     },
 };
@@ -35,8 +24,6 @@ impl<'a> Builder<'a, InGlobal> {
             );
         }
 
-        let empty_subs = HashMap::new();
-
         for m in &modules {
             let mut module_builder = self.as_module(m.path.clone());
 
@@ -46,12 +33,31 @@ impl<'a> Builder<'a, InGlobal> {
                         module_builder.build_type_alias_decl(
                             alias.clone(),
                             alias.identifier.span.clone(),
-                            &empty_subs,
                         );
                     }
                     Declaration::Fn(f) => {
                         module_builder.register_fn_signature(f);
                     }
+                    _ => {}
+                }
+            }
+
+            for stmt in &m.statements {
+                match &stmt.kind {
+                    StmtKind::From { path, items } => {
+                        module_builder.build_from_stmt(
+                            path.clone(),
+                            items.clone(),
+                            stmt.span.clone(),
+                        );
+                    }
+                    StmtKind::VarDecl(var_decl) => {
+                        module_builder.errors.push(SemanticError {
+                            kind: SemanticErrorKind::CannotDeclareGlobalVariable,
+                            span: var_decl.identifier.span.clone(),
+                        });
+                    }
+                    _ => {}
                 }
             }
         }
@@ -61,25 +67,11 @@ impl<'a> Builder<'a, InGlobal> {
 
             for stmt in m.statements {
                 match stmt.kind {
-                    StmtKind::From { path, items } => {
-                        module_builder.build_from_stmt(path, items, stmt.span);
-                    }
-                    StmtKind::TypeAliasDecl(decl) => {
-                        if !decl.generic_params.is_empty() {
-                            module_builder.early_check_generic_type_alias(decl);
-                        }
-                    }
                     StmtKind::Expression(expr) => {
                         if let ExprKind::Fn(f) = expr.kind {
-                            if f.generic_params.is_empty() {
-                                if let Err(e) =
-                                    module_builder.build_fn_body(*f, &empty_subs)
-                                {
-                                    module_builder.errors.push(e);
-                                };
-                            } else {
-                                module_builder.early_check_generic_fn(*f);
-                            }
+                            if let Err(e) = module_builder.build_fn_body(*f) {
+                                module_builder.errors.push(e);
+                            };
                         }
                     }
                     _ => {}
@@ -95,59 +87,23 @@ impl<'a> Builder<'a, InGlobal> {
             program: self.program,
             errors: self.errors,
             current_scope: scope,
+            current_def: self.current_def,
+            incomplete_phis: self.incomplete_phis,
+            current_memory_def: self.current_memory_def,
+            incomplete_memory_phis: self.incomplete_memory_phis,
         }
     }
 }
 
 impl<'a> Builder<'a, InModule> {
-    fn register_fn_signature(&mut self, f: &FnDecl) {
-        let decl_name = f.identifier.name;
-
-        if !f.generic_params.is_empty() {
-            let gen_id = next_generic_declaration_id();
-
-            self.program.generic_declarations.insert(
-                gen_id,
-                GenericDeclaration::Function {
-                    decl: f.clone(),
-                    decl_scope: self.current_scope.clone(),
-                    has_errors: false,
-                },
-            );
-
-            self.current_scope
-                .map_name_to_symbol(decl_name, SymbolId::Generic(gen_id));
-            return;
-        }
-
-        let empty_subs = HashMap::new();
-        let checked_params = self.check_params(&f.params, &empty_subs);
-        let checked_return_type = self.check_type_annotation(&f.return_type, &empty_subs);
-
-        let function_params = checked_params
-            .into_iter()
-            .map(|p| FunctionParam {
-                identifier: p.identifier,
-                ty: p.ty,
-            })
-            .collect();
-
+    fn register_fn_signature(&mut self, f: &crate::ast::decl::FnDecl) {
         let decl_id = f.id;
-
-        let function = CheckedFunctionDecl {
-            id: decl_id,
-            identifier: f.identifier.clone(),
-            params: function_params,
-            return_type: checked_return_type,
-            is_exported: f.is_exported,
-            body: FunctionBodyKind::NotBuilt,
-        };
+        let decl_name = f.identifier.name;
 
         self.program
             .declarations
-            .insert(decl_id, CheckedDeclaration::Function(function));
+            .insert(decl_id, Declaration::Fn(f.clone()));
 
-        self.current_scope
-            .map_name_to_symbol(decl_name, SymbolId::Concrete(decl_id));
+        self.current_scope.map_name_to_symbol(decl_name, decl_id);
     }
 }

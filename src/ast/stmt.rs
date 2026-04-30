@@ -1,4 +1,4 @@
-use crate::ast::{decl::FnDecl, IdentifierNode, Span, StringNode};
+use crate::ast::{decl::ExternFnDecl, IdentifierNode, Span, StringNode};
 
 use super::{
     decl::{TypeAliasDecl, VarDecl},
@@ -11,7 +11,7 @@ pub enum ImportItem {
         identifier: IdentifierNode,
         alias: Option<IdentifierNode>,
     },
-    ExternFn(FnDecl),
+    ExternFn(ExternFnDecl),
 }
 
 #[derive(Clone, Debug, PartialEq)]

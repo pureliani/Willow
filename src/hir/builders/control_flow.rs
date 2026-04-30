@@ -3,8 +3,8 @@ use crate::{
     hir::{
         builders::{BasicBlockId, Builder, InBlock},
         instructions::{
-            CallInstr, InstrDefinition, InstrId, InstructionKind, MakeLiteralKind,
-            PhiInstr, PhiSource, Terminator,
+            BuiltinFunction, CallBuiltinInstr, CallInstr, InstrDefinition, InstrId,
+            InstructionKind, MakeLiteralKind, PhiInstr, PhiSource, Terminator,
         },
     },
 };
@@ -34,6 +34,27 @@ impl<'a> Builder<'a, InBlock> {
         self.push_instruction(
             InstructionKind::Call(CallInstr {
                 func,
+                args,
+                memory_in,
+                memory_out,
+            }),
+            span,
+        )
+    }
+
+    pub fn emit_call_builtin(
+        &mut self,
+        builtin: BuiltinFunction,
+        args: Vec<InstrId>,
+        span: Span,
+    ) -> InstrId {
+        let memory_in = self.read_memory(self.context.block_id);
+        let memory_out = self.cfg_mut().new_memory_id();
+        self.write_memory(self.context.block_id, memory_out);
+
+        self.push_instruction(
+            InstructionKind::CallBuiltin(CallBuiltinInstr {
+                builtin,
                 args,
                 memory_in,
                 memory_out,

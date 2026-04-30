@@ -78,6 +78,7 @@ impl Parser {
                 let constraint = p.parse_type_annotation(0)?;
 
                 Ok(Param {
+                    id: next_declaration_id(),
                     constraint,
                     identifier: param_ident,
                 })

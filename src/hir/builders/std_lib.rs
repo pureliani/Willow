@@ -1,16 +1,14 @@
 use crate::{
-    ast::{stmt::ImportItem, IdentifierNode, Span, SymbolId},
-    compile::interner::TypeId,
+    ast::{
+        decl::{Declaration, ExternFnDecl, Param},
+        stmt::ImportItem,
+        type_annotation::{TypeAnnotation, TypeAnnotationKind},
+        IdentifierNode, Span,
+    },
     globals::{next_declaration_id, STRING_INTERNER},
     hir::{
-        builders::{
-            Builder, CheckedFunctionDecl, FunctionBodyKind, FunctionParam, InModule,
-        },
+        builders::{Builder, InModule},
         errors::{SemanticError, SemanticErrorKind},
-        types::{
-            checked_declaration::CheckedDeclaration,
-            checked_type::{SpannedType, StructKind, Type},
-        },
     },
 };
 
@@ -35,13 +33,10 @@ impl<'a> Builder<'a, InModule> {
 
                         self.program
                             .declarations
-                            .insert(decl_id, CheckedDeclaration::Function(func));
+                            .insert(decl_id, Declaration::ExternFn(func));
 
                         let name_to_bind = alias.unwrap_or(identifier).name;
-                        self.current_scope.map_name_to_symbol(
-                            name_to_bind,
-                            SymbolId::Concrete(decl_id),
-                        );
+                        self.current_scope.map_name_to_symbol(name_to_bind, decl_id);
                     } else {
                         self.errors.push(SemanticError {
                             kind: SemanticErrorKind::UndeclaredIdentifier(
@@ -68,12 +63,21 @@ impl<'a> Builder<'a, InModule> {
         module: &str,
         symbol: &str,
         span: Span,
-    ) -> Option<CheckedFunctionDecl> {
-        let void_ty = self.types.void();
-        let string_ty = self
-            .types
-            .ptr(self.types.intern(&Type::Struct(StructKind::String)));
-        let usize_ty = self.types.usize(None);
+    ) -> Option<ExternFnDecl> {
+        let void_ty = TypeAnnotation {
+            kind: TypeAnnotationKind::Void,
+            span: span.clone(),
+        };
+
+        let string_ty = TypeAnnotation {
+            kind: TypeAnnotationKind::String(None),
+            span: span.clone(),
+        };
+
+        let usize_ty = TypeAnnotation {
+            kind: TypeAnnotationKind::USize(None),
+            span: span.clone(),
+        };
 
         match (module, symbol) {
             // std/io
@@ -83,11 +87,15 @@ impl<'a> Builder<'a, InModule> {
 
             // std/string
             ("std/string", "concat") => {
-                let ptr_ptr_string = self.types.ptr(string_ty);
+                let list_of_strings = TypeAnnotation {
+                    kind: TypeAnnotationKind::List(Box::new(string_ty.clone())),
+                    span: span.clone(),
+                };
+
                 Some(self.make_builtin_fn(
                     symbol,
                     span,
-                    vec![("parts", ptr_ptr_string), ("count", usize_ty)],
+                    vec![("parts", list_of_strings), ("count", usize_ty)],
                     string_ty,
                 ))
             }
@@ -96,7 +104,7 @@ impl<'a> Builder<'a, InModule> {
             ("std/fs", "read_file") => Some(self.make_builtin_fn(
                 symbol,
                 span,
-                vec![("path", string_ty)],
+                vec![("path", string_ty.clone())],
                 string_ty,
             )),
 
@@ -108,9 +116,9 @@ impl<'a> Builder<'a, InModule> {
         &self,
         name: &str,
         span: Span,
-        params: Vec<(&str, TypeId)>,
-        return_type: TypeId,
-    ) -> CheckedFunctionDecl {
+        params: Vec<(&str, TypeAnnotation)>,
+        return_type: TypeAnnotation,
+    ) -> ExternFnDecl {
         let id = next_declaration_id();
         let identifier = IdentifierNode {
             name: STRING_INTERNER.intern(name),
@@ -119,30 +127,22 @@ impl<'a> Builder<'a, InModule> {
 
         let function_params = params
             .into_iter()
-            .map(|(p_name, p_ty)| FunctionParam {
+            .map(|(p_name, p_ty)| Param {
+                id: next_declaration_id(),
                 identifier: IdentifierNode {
                     name: STRING_INTERNER.intern(p_name),
                     span: span.clone(),
                 },
-                ty: SpannedType {
-                    id: p_ty,
-                    span: span.clone(),
-                },
-                decl_id: None,
-                value_id: None,
+                constraint: p_ty,
             })
             .collect();
 
-        CheckedFunctionDecl {
+        ExternFnDecl {
             id,
+            documentation: None,
             identifier,
             params: function_params,
-            return_type: SpannedType {
-                id: return_type,
-                span: span.clone(),
-            },
-            is_exported: false,
-            body: FunctionBodyKind::External,
+            return_type,
         }
     }
 }

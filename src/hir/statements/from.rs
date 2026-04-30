@@ -1,11 +1,15 @@
 use crate::{
-    ast::{decl::FnDecl, stmt::ImportItem, ModulePath, Span, StringNode},
+    ast::{
+        decl::{Declaration, ExternFnDecl},
+        stmt::ImportItem,
+        ModulePath, Span, StringNode,
+    },
     hir::{
         builders::{Builder, InModule},
         errors::{SemanticError, SemanticErrorKind},
     },
 };
-use std::collections::HashMap;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -99,41 +103,20 @@ impl<'a> Builder<'a, InModule> {
                             },
                         };
 
-                        if let Some(symbol_id) =
+                        if let Some(decl_id) =
                             target_module.root_scope.lookup(imported_ident.name)
                         {
-                            let is_exported = match symbol_id {
-                                SymbolId::Concrete(id) => {
-                                    match self.program.declarations.get(&id) {
-                                        Some(CheckedDeclaration::Function(f)) => {
-                                            f.is_exported
-                                        }
-                                        Some(CheckedDeclaration::TypeAlias(t)) => {
-                                            t.is_exported
-                                        }
-                                        _ => false,
-                                    }
-                                }
-                                SymbolId::Generic(id) => {
-                                    match self.program.generic_declarations.get(&id) {
-                                        Some(GenericDeclaration::Function {
-                                            decl,
-                                            ..
-                                        }) => decl.is_exported,
-                                        Some(GenericDeclaration::TypeAlias {
-                                            decl,
-                                            ..
-                                        }) => decl.is_exported,
-                                        _ => false,
-                                    }
-                                }
-                                SymbolId::GenericParameter(_) => panic!("INTERNAL COMPILER ERROR: Generic parameters cannot be imported"),
-                            };
+                            let is_exported =
+                                match self.program.declarations.get(&decl_id) {
+                                    Some(Declaration::Fn(f)) => f.is_exported,
+                                    Some(Declaration::TypeAlias(t)) => t.is_exported,
+                                    _ => false,
+                                };
 
                             if is_exported {
                                 let name_node = alias.unwrap_or(imported_ident);
                                 self.current_scope
-                                    .map_name_to_symbol(name_node.name, symbol_id);
+                                    .map_name_to_symbol(name_node.name, decl_id);
                             } else {
                                 self.errors.push(not_exported_err);
                             }
@@ -154,32 +137,14 @@ impl<'a> Builder<'a, InModule> {
         }
     }
 
-    fn register_extern_fn(&mut self, f: FnDecl) {
-        let empty_subs = HashMap::new();
-        let checked_params = self.check_params(&f.params, &empty_subs);
-        let checked_return_type = self.check_type_annotation(&f.return_type, &empty_subs);
-
-        let function_params = checked_params
-            .into_iter()
-            .map(|p| FunctionParam {
-                identifier: p.identifier,
-                ty: p.ty,
-            })
-            .collect();
-
-        let function = CheckedFunctionDecl {
-            id: f.id,
-            identifier: f.identifier.clone(),
-            params: function_params,
-            return_type: checked_return_type,
-            is_exported: false,
-            body: FunctionBodyKind::External,
-        };
+    fn register_extern_fn(&mut self, f: ExternFnDecl) {
+        let decl_id = f.id;
+        let name = f.identifier.name;
 
         self.program
             .declarations
-            .insert(f.id, CheckedDeclaration::Function(function));
-        self.current_scope
-            .map_name_to_symbol(f.identifier.name, SymbolId::Concrete(f.id));
+            .insert(decl_id, Declaration::ExternFn(f));
+
+        self.current_scope.map_name_to_symbol(name, decl_id);
     }
 }

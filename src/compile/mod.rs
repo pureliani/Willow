@@ -262,7 +262,7 @@ impl Compiler {
         }
 
         if options.emit_hir {
-            dump_program(&program, &self.types);
+            dump_program(&program);
         }
 
         self.errors

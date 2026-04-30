@@ -3,6 +3,7 @@ use crate::{
         decl::Param,
         type_annotation::{TypeAnnotation, TypeAnnotationKind},
     },
+    globals::next_declaration_id,
     parse::ParsingError,
     tokenize::{KeywordKind, PunctuationKind, TokenKind},
 };
@@ -22,6 +23,7 @@ impl Parser {
                 let constraint = p.parse_type_annotation(0)?;
 
                 Ok(Param {
+                    id: next_declaration_id(),
                     constraint,
                     identifier,
                 })

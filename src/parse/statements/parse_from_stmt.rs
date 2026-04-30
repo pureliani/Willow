@@ -1,11 +1,10 @@
 use crate::{
     ast::{
-        decl::FnDecl,
-        expr::BlockContents,
+        decl::ExternFnDecl,
         stmt::{ImportItem, Stmt, StmtKind},
     },
     globals::next_declaration_id,
-    parse::{Parser, ParsingError},
+    parse::{Parser, ParsingError, ParsingErrorKind},
     tokenize::{KeywordKind, PunctuationKind, TokenKind},
 };
 
@@ -20,28 +19,24 @@ impl Parser {
         let items = self.comma_separated(
             |p| {
                 if p.match_token(0, TokenKind::Keyword(KeywordKind::Fn)) {
-                    let fn_start_offset = p.offset;
-
                     let (identifier, generic_params, params, return_type) =
                         p.parse_fn_signature()?;
 
+                    if !generic_params.is_empty() {
+                        return Err(ParsingError {
+                            kind: ParsingErrorKind::ExternFnCannotBeGeneric,
+                            span: identifier.span.clone(),
+                        });
+                    }
+
                     let id = next_declaration_id();
 
-                    let body = BlockContents {
-                        statements: vec![],
-                        final_expr: None,
-                        span: p.get_span(fn_start_offset, p.offset - 1)?,
-                    };
-
-                    Ok(ImportItem::ExternFn(FnDecl {
+                    Ok(ImportItem::ExternFn(ExternFnDecl {
                         id,
                         documentation: None,
                         identifier,
                         params,
-                        generic_params,
                         return_type,
-                        body,
-                        is_exported: false,
                     }))
                 } else {
                     let identifier = p.consume_identifier()?;

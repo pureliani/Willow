@@ -24,6 +24,10 @@ impl<'a> Builder<'a, InBlock> {
         let decl = self.program.declarations.get(&decl_id).unwrap();
 
         match decl {
+            Declaration::ExternFn(_) => self.push_instruction(
+                InstructionKind::MakeLiteral(MakeLiteralKind::Fn(decl_id)),
+                span,
+            ),
             Declaration::Fn(_) => self.push_instruction(
                 InstructionKind::MakeLiteral(MakeLiteralKind::Fn(decl_id)),
                 span,

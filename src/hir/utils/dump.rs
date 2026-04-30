@@ -1,70 +1,71 @@
 use crate::{
-    compile::interner::TypeInterner,
+    ast::decl::Declaration,
     globals::STRING_INTERNER,
     hir::{
         builders::Program,
         instructions::{
-            BinaryInstr, CallInstr, CastInstr, InstructionKind, MemoryInstr, SelectInstr,
-            Terminator, UnaryInstr,
+            BasicBlockId, BinaryOpKind, BuiltinFunction, FunctionCFG, InstrId,
+            InstructionKind, MakeLiteralKind, MemoryInstr, Place, Terminator,
+            UnaryOpKind,
         },
-        types::checked_type::Type,
     },
 };
 use std::fmt::Write;
 
-fn get_vt(cfg: &FunctionCFG, vid: &ValueId, interner: &TypeInterner) -> String {
-    interner.to_string(cfg.values[vid].ty)
-}
-
-pub fn dump_program(program: &Program, interner: &TypeInterner) {
+pub fn dump_program(program: &Program) {
     let mut out = String::new();
     writeln!(out, "========== HIR DUMP START ==========").unwrap();
-    for (_, decl) in program.declarations.iter() {
-        if let CheckedDeclaration::Function(f) = decl {
-            dump_function(f, interner, &mut out);
+
+    for (decl_id, cfg) in &program.cfgs {
+        if let Some(Declaration::Fn(f)) = program.declarations.get(decl_id) {
+            dump_function(f, cfg, &mut out);
         }
     }
+
     writeln!(out, "====================================").unwrap();
     println!("{}", out);
 }
 
-fn dump_function(f: &CheckedFunctionDecl, interner: &TypeInterner, out: &mut String) {
+fn dump_function(f: &crate::ast::decl::FnDecl, cfg: &FunctionCFG, out: &mut String) {
     let fn_name = STRING_INTERNER.resolve(f.identifier.name);
-    let return_type = interner.to_string(f.return_type.id);
-    writeln!(out, "fn {fn_name} -> {return_type}:").unwrap();
+    writeln!(out, "fn {fn_name}:").unwrap();
 
-    let block_ids = if let FunctionBodyKind::Internal(cfg) = &f.body {
-        cfg.blocks.keys().cloned().collect()
-    } else {
-        vec![]
-    };
-
-    for bid in block_ids {
-        dump_block(&bid, f, interner, out);
+    for (bid, bb) in &cfg.blocks {
+        dump_block(bid, bb, cfg, out);
     }
 }
 
 pub fn dump_block(
     block_id: &BasicBlockId,
-    f: &CheckedFunctionDecl,
-    interner: &TypeInterner,
+    bb: &crate::hir::instructions::BasicBlock,
+    cfg: &FunctionCFG,
     out: &mut String,
 ) {
-    let cfg = f.expect_body();
-    let bb = cfg.blocks.get(block_id).unwrap();
-    writeln!(out, "  block_{}:", bb.id.0).unwrap();
+    writeln!(out, "  block_{}:", block_id.0).unwrap();
 
-    writeln!(out, "    predecessors {{ ").unwrap();
-    for p in &bb.predecessors {
-        writeln!(out, "      block_{}", p.0).unwrap();
+    if !bb.predecessors.is_empty() {
+        write!(out, "    predecessors: ").unwrap();
+        let preds: Vec<_> = bb
+            .predecessors
+            .iter()
+            .map(|p| format!("block_{}", p.0))
+            .collect();
+        writeln!(out, "{}", preds.join(", ")).unwrap();
     }
-    writeln!(out, "    }} ").unwrap();
 
-    writeln!(out).unwrap();
+    for (mem_id, sources) in &bb.memory_phis {
+        let srcs: Vec<_> = sources
+            .iter()
+            .map(|s| format!("[m{}, block_{}]", s.memory.0, s.block.0))
+            .collect();
+        writeln!(out, "    m{} = memory_phi {}", mem_id.0, srcs.join(", ")).unwrap();
+    }
 
-    dump_instructions(&bb.instructions, cfg, interner, out);
+    for &instr_id in &bb.instructions {
+        dump_instruction(instr_id, cfg, out);
+    }
 
-    if let Some(term) = bb.terminator.clone() {
+    if let Some(term) = &bb.terminator {
         match term {
             Terminator::Jump { target } => {
                 writeln!(out, "    jmp block_{}", target.0).unwrap();
@@ -76,303 +77,193 @@ pub fn dump_block(
             } => {
                 writeln!(
                     out,
-                    "    cond_jmp v{} ? block_{} : block_{}\n",
+                    "    cond_jmp v{} ? block_{} : block_{}",
                     condition.0, true_target.0, false_target.0
                 )
                 .unwrap();
             }
             Terminator::Return { value } => {
-                writeln!(out, "    ret v{}\n", value.0).unwrap();
+                writeln!(out, "    ret v{}", value.0).unwrap();
             }
             Terminator::Unreachable => {
-                writeln!(out, "    unreachable\n").unwrap();
+                writeln!(out, "    unreachable").unwrap();
             }
         }
     }
+    writeln!(out).unwrap();
 }
 
-pub fn dump_instructions(
-    instrs: &[InstructionKind],
-    cfg: &FunctionCFG,
-    interner: &TypeInterner,
-    out: &mut String,
-) {
-    let get_binary_sign = |instr: &BinaryInstr| match instr {
-        BinaryInstr::IAdd { .. } | BinaryInstr::FAdd { .. } => "+",
-        BinaryInstr::ISub { .. } | BinaryInstr::FSub { .. } => "-",
-        BinaryInstr::IMul { .. } | BinaryInstr::FMul { .. } => "*",
-        BinaryInstr::SDiv { .. }
-        | BinaryInstr::UDiv { .. }
-        | BinaryInstr::FDiv { .. } => "/",
-        BinaryInstr::SRem { .. }
-        | BinaryInstr::URem { .. }
-        | BinaryInstr::FRem { .. } => "%",
-    };
+fn format_place(place: &Place) -> String {
+    match place {
+        Place::Var(id) => format!("var_{}", id.0),
+        Place::Expr(id) => format!("(v{})", id.0),
+        Place::Field(base, name) => {
+            format!(
+                "{}.{}",
+                format_place(base),
+                STRING_INTERNER.resolve(name.name)
+            )
+        }
+        Place::Deref(base) => format!("*{}", format_place(base)),
+    }
+}
 
-    let get_comp_sign = |instr: &CompInstr| match instr {
-        CompInstr::IEq { .. } | CompInstr::FEq { .. } => "==",
-        CompInstr::INeq { .. } | CompInstr::FNeq { .. } => "!=",
-        CompInstr::SLt { .. } | CompInstr::ULt { .. } | CompInstr::FLt { .. } => "<",
-        CompInstr::SLte { .. } | CompInstr::ULte { .. } | CompInstr::FLte { .. } => "<=",
-        CompInstr::SGt { .. } | CompInstr::UGt { .. } | CompInstr::FGt { .. } => ">",
-        CompInstr::SGte { .. } | CompInstr::UGte { .. } | CompInstr::FGte { .. } => ">=",
-    };
+pub fn dump_instruction(instr_id: InstrId, cfg: &FunctionCFG, out: &mut String) {
+    let def = cfg.get_instr(instr_id);
 
-    let get_cast_name = |instr: &CastInstr| match instr {
-        CastInstr::SIToF { .. } => "SIToF",
-        CastInstr::FToSI { .. } => "FToSI",
-        CastInstr::FExt { .. } => "FExt",
-        CastInstr::FTrunc { .. } => "FTrunc",
-        CastInstr::Trunc { .. } => "Trunc",
-        CastInstr::SExt { .. } => "SExt",
-        CastInstr::ZExt { .. } => "ZExt",
-        CastInstr::BitCast { .. } => "BitCast",
-        CastInstr::UIToF { .. } => "UIToF",
-        CastInstr::FToUI { .. } => "FToUI",
-    };
+    write!(out, "    v{} = ", instr_id.0).unwrap();
 
-    for instruction in instrs {
-        write!(out, "    ").unwrap();
-        match instruction {
-            InstructionKind::Unary(kind) => match kind {
-                UnaryInstr::INeg { dest, src } | UnaryInstr::FNeg { dest, src } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = -v{};",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        src.0
-                    )
-                    .unwrap();
-                }
-                UnaryInstr::BNot { dest, src } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = !v{};",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        src.0
-                    )
-                    .unwrap();
-                }
-            },
-            InstructionKind::Binary(kind) => match kind {
-                BinaryInstr::IAdd { dest, lhs, rhs }
-                | BinaryInstr::ISub { dest, lhs, rhs }
-                | BinaryInstr::IMul { dest, lhs, rhs }
-                | BinaryInstr::SDiv { dest, lhs, rhs }
-                | BinaryInstr::UDiv { dest, lhs, rhs }
-                | BinaryInstr::SRem { dest, lhs, rhs }
-                | BinaryInstr::URem { dest, lhs, rhs }
-                | BinaryInstr::FRem { dest, lhs, rhs }
-                | BinaryInstr::FAdd { dest, lhs, rhs }
-                | BinaryInstr::FSub { dest, lhs, rhs }
-                | BinaryInstr::FMul { dest, lhs, rhs }
-                | BinaryInstr::FDiv { dest, lhs, rhs } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = v{} {} v{};",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        lhs.0,
-                        get_binary_sign(kind),
-                        rhs.0
-                    )
-                    .unwrap();
-                }
-            },
-            InstructionKind::Comp(kind) => match kind {
-                CompInstr::IEq { dest, lhs, rhs }
-                | CompInstr::INeq { dest, lhs, rhs }
-                | CompInstr::SLt { dest, lhs, rhs }
-                | CompInstr::SLte { dest, lhs, rhs }
-                | CompInstr::SGt { dest, lhs, rhs }
-                | CompInstr::SGte { dest, lhs, rhs }
-                | CompInstr::ULt { dest, lhs, rhs }
-                | CompInstr::ULte { dest, lhs, rhs }
-                | CompInstr::UGt { dest, lhs, rhs }
-                | CompInstr::UGte { dest, lhs, rhs }
-                | CompInstr::FEq { dest, lhs, rhs }
-                | CompInstr::FNeq { dest, lhs, rhs }
-                | CompInstr::FLt { dest, lhs, rhs }
-                | CompInstr::FLte { dest, lhs, rhs }
-                | CompInstr::FGt { dest, lhs, rhs }
-                | CompInstr::FGte { dest, lhs, rhs } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = v{} {} v{};",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        lhs.0,
-                        get_comp_sign(kind),
-                        rhs.0
-                    )
-                    .unwrap();
-                }
-            },
-            InstructionKind::Select(SelectInstr {
-                dest,
-                cond,
-                true_val,
-                false_val,
-            }) => {
-                writeln!(
-                    out,
-                    "v{}: {} = v{} ? v{} : v{};",
-                    dest.0,
-                    get_vt(cfg, dest, interner),
-                    cond.0,
-                    true_val.0,
-                    false_val.0
-                )
-                .unwrap();
+    match &def.kind {
+        InstructionKind::CallBuiltin(c) => {
+            let args: Vec<_> = c.args.iter().map(|a| format!("v{}", a.0)).collect();
+            let name = match c.builtin {
+                BuiltinFunction::StringConcat => "builtin_string_concat",
+            };
+            writeln!(
+                out,
+                "call {} ({}) [m{} -> m{}]",
+                name,
+                args.join(", "),
+                c.memory_in.0,
+                c.memory_out.0
+            )
+            .unwrap();
+        }
+        InstructionKind::MakeLiteral(lit) => match lit {
+            MakeLiteralKind::Number(n) => writeln!(out, "{}", n.to_string()).unwrap(),
+            MakeLiteralKind::Bool(b) => writeln!(out, "{}", b).unwrap(),
+            MakeLiteralKind::String(s) => {
+                writeln!(out, "\"{}\"", STRING_INTERNER.resolve(*s)).unwrap()
             }
-            InstructionKind::Call(CallInstr { dest, func, args }) => {
-                let args = args
-                    .iter()
-                    .map(|a| format!("v{}", a.0))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-
-                writeln!(
-                    out,
-                    "v{}: {} = call v{}({});",
-                    dest.0,
-                    get_vt(cfg, dest, interner),
-                    func.0,
-                    args
-                )
-                .unwrap();
+            MakeLiteralKind::Fn(id) => writeln!(out, "fn_{}", id.0).unwrap(),
+            MakeLiteralKind::Null => writeln!(out, "null").unwrap(),
+            MakeLiteralKind::Void => writeln!(out, "void").unwrap(),
+            MakeLiteralKind::Unknown => writeln!(out, "unknown").unwrap(),
+            MakeLiteralKind::Never => writeln!(out, "never").unwrap(),
+        },
+        InstructionKind::Unary(u) => {
+            let op_str = match u.op {
+                UnaryOpKind::Neg => "-",
+                UnaryOpKind::Not => "!",
+            };
+            writeln!(out, "{}v{}", op_str, u.value.0).unwrap();
+        }
+        InstructionKind::Binary(b) => {
+            let op_str = match b.op {
+                BinaryOpKind::Add => "+",
+                BinaryOpKind::Sub => "-",
+                BinaryOpKind::Mul => "*",
+                BinaryOpKind::Div => "/",
+                BinaryOpKind::Rem => "%",
+                BinaryOpKind::Eq => "==",
+                BinaryOpKind::Neq => "!=",
+                BinaryOpKind::Lt => "<",
+                BinaryOpKind::Lte => "<=",
+                BinaryOpKind::Gt => ">",
+                BinaryOpKind::Gte => ">=",
+            };
+            writeln!(out, "v{} {} v{}", b.lhs.0, op_str, b.rhs.0).unwrap();
+        }
+        InstructionKind::Cast(c) => {
+            writeln!(out, "cast v{} to <type>", c.src.0).unwrap();
+        }
+        InstructionKind::Memory(m) => match m {
+            MemoryInstr::StackAlloc { count, .. } => {
+                writeln!(out, "stack_alloc {} items", count).unwrap()
             }
-
-            InstructionKind::Memory(kind) => match kind {
-                MemoryInstr::StackAlloc { dest, count } => {
-                    let inner_ty = match interner.resolve(cfg.values[dest].ty) {
-                        Type::Pointer(to) => interner.to_string(to),
-                        _ => "unknown".to_string(),
-                    };
-                    writeln!(
-                        out,
-                        "v{}: {} = stackAlloc({} x {});",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        count,
-                        inner_ty
-                    )
-                    .unwrap();
-                }
-                MemoryInstr::HeapAlloc { dest, count } => {
-                    let inner_ty = match interner.resolve(cfg.values[dest].ty) {
-                        Type::Pointer(to) => interner.to_string(to),
-                        _ => "unknown".to_string(),
-                    };
-                    writeln!(
-                        out,
-                        "v{}: {} = heapAlloc(v{} x {});",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        count.0,
-                        inner_ty
-                    )
-                    .unwrap();
-                }
-                MemoryInstr::HeapFree { ptr } => {
-                    writeln!(out, "free(v{})", ptr.0).unwrap();
-                }
-                MemoryInstr::Store { ptr, value } => {
-                    writeln!(out, "*v{} = v{};", ptr.0, value.0).unwrap();
-                }
-                MemoryInstr::Load { dest, ptr } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = *v{};",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        ptr.0
-                    )
-                    .unwrap();
-                }
-                MemoryInstr::MemCopy { dest, src } => {
-                    writeln!(
-                        out,
-                        "memcopy from address v{} to address v{};",
-                        dest.0, src.0
-                    )
-                    .unwrap();
-                }
-                MemoryInstr::GetFieldPtr {
-                    dest,
-                    base_ptr,
-                    field_index,
-                } => {
-                    let base_ty = cfg.values[base_ptr].ty;
-                    let field_name = match interner.resolve(base_ty) {
-                        Type::Pointer(to) => match interner.resolve(to) {
-                            Type::Struct(s) => STRING_INTERNER
-                                .resolve(s.fields(interner)[*field_index].0)
-                                .to_string(),
-                            _ => format!("{}", field_index),
-                        },
-                        _ => format!("{}", field_index),
-                    };
-                    writeln!(
-                        out,
-                        "v{}: {} = &v{}.{};",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        base_ptr.0,
-                        field_name
-                    )
-                    .unwrap();
-                }
-                MemoryInstr::PtrOffset {
-                    dest,
-                    base_ptr,
-                    index,
-                } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = {} + v{};",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        base_ptr.0,
-                        index.0
-                    )
-                    .unwrap();
-                }
-            },
-            InstructionKind::Cast(kind) => match kind {
-                CastInstr::SIToF { dest, src }
-                | CastInstr::UIToF { dest, src }
-                | CastInstr::FToSI { dest, src }
-                | CastInstr::FToUI { dest, src }
-                | CastInstr::FExt { dest, src }
-                | CastInstr::FTrunc { dest, src }
-                | CastInstr::Trunc { dest, src }
-                | CastInstr::SExt { dest, src }
-                | CastInstr::ZExt { dest, src }
-                | CastInstr::BitCast { dest, src } => {
-                    writeln!(
-                        out,
-                        "v{}: {} = {}(v{})",
-                        dest.0,
-                        get_vt(cfg, dest, interner),
-                        get_cast_name(kind),
-                        src.0
-                    )
-                    .unwrap();
-                }
-            },
-            InstructionKind::Materialize(mat) => {
-                writeln!(
-                    out,
-                    "v{}: {} = materialize {};",
-                    mat.dest.0,
-                    get_vt(cfg, &mat.dest, interner),
-                    interner.to_string(interner.intern(&Type::Literal(mat.literal_type)))
-                )
-                .unwrap();
+            MemoryInstr::HeapAlloc { count, .. } => {
+                writeln!(out, "heap_alloc v{} items", count.0).unwrap()
             }
+            MemoryInstr::HeapFree {
+                ptr,
+                memory_in,
+                memory_out,
+            } => writeln!(
+                out,
+                "free v{} [m{} -> m{}]",
+                ptr.0, memory_in.0, memory_out.0
+            )
+            .unwrap(),
+            MemoryInstr::MemCopy {
+                from,
+                to,
+                memory_in,
+                memory_out,
+            } => writeln!(
+                out,
+                "memcopy v{} to v{} [m{} -> m{}]",
+                from.0, to.0, memory_in.0, memory_out.0
+            )
+            .unwrap(),
+            MemoryInstr::PtrOffset { base_ptr, index } => {
+                writeln!(out, "v{} + offset v{}", base_ptr.0, index.0).unwrap()
+            }
+            MemoryInstr::ReadPlace { place, memory_in } => {
+                writeln!(out, "read {} [m{}]", format_place(place), memory_in.0).unwrap()
+            }
+            MemoryInstr::WritePlace {
+                place,
+                value,
+                memory_in,
+                memory_out,
+            } => writeln!(
+                out,
+                "write v{} to {} [m{} -> m{}]",
+                value.0,
+                format_place(place),
+                memory_in.0,
+                memory_out.0
+            )
+            .unwrap(),
+        },
+        InstructionKind::Call(c) => {
+            let args: Vec<_> = c.args.iter().map(|a| format!("v{}", a.0)).collect();
+            writeln!(
+                out,
+                "call v{}({}) [m{} -> m{}]",
+                c.func.0,
+                args.join(", "),
+                c.memory_in.0,
+                c.memory_out.0
+            )
+            .unwrap();
+        }
+        InstructionKind::Select(s) => {
+            writeln!(
+                out,
+                "select v{} ? v{} : v{}",
+                s.cond.0, s.true_val.0, s.false_val.0
+            )
+            .unwrap();
+        }
+        InstructionKind::Phi(p) => {
+            let srcs: Vec<_> = p
+                .sources
+                .iter()
+                .map(|s| format!("[v{}, block_{}]", s.value.0, s.block.0))
+                .collect();
+            writeln!(out, "phi {}", srcs.join(", ")).unwrap();
+        }
+        InstructionKind::IsType(i) => {
+            writeln!(out, "is_type v{} <type>", i.src.0).unwrap();
+        }
+        InstructionKind::Param(idx) => {
+            writeln!(out, "param {}", idx).unwrap();
+        }
+        InstructionKind::StructInit(s) => {
+            let fields: Vec<_> = s
+                .fields
+                .iter()
+                .map(|(n, v)| format!("{}: v{}", STRING_INTERNER.resolve(n.name), v.0))
+                .collect();
+            writeln!(out, "struct_init {{ {} }}", fields.join(", ")).unwrap();
+        }
+        InstructionKind::ListInit(l) => {
+            let items: Vec<_> = l.items.iter().map(|v| format!("v{}", v.0)).collect();
+            writeln!(out, "list_init [ {} ]", items.join(", ")).unwrap();
+        }
+        InstructionKind::GenericApply(g) => {
+            writeln!(out, "generic_apply v{}<...>", g.func.0).unwrap();
         }
     }
 }

@@ -29,6 +29,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParsingErrorKind {
+    ExternFnCannotBeGeneric,
     ExpectedATagTypeButFound(TypeAnnotation),
     DocMustBeFollowedByDeclaration,
     ExpectedAnExpressionButFound(Token),
@@ -54,18 +55,19 @@ impl ParsingErrorKind {
             ParsingErrorKind::ExpectedAnExpressionButFound(..) => 2,
             ParsingErrorKind::ExpectedATypeButFound(..) => 3,
             ParsingErrorKind::InvalidSuffixOperator(..) => 4,
-            ParsingErrorKind::UnexpectedEndOfInput => 15,
-            ParsingErrorKind::ExpectedAnIdentifier => 16,
-            ParsingErrorKind::ExpectedAPunctuationMark(..) => 17,
-            ParsingErrorKind::ExpectedAKeyword(..) => 18,
-            ParsingErrorKind::ExpectedAStringValue => 19,
-            ParsingErrorKind::ExpectedANumericValue => 20,
-            ParsingErrorKind::UnknownStaticMethod(..) => 21,
-            ParsingErrorKind::UnexpectedStatementAfterFinalExpression => 22,
-            ParsingErrorKind::ExpectedStatementOrExpression { .. } => 23,
-            ParsingErrorKind::UnexpectedTokenAfterFinalExpression { .. } => 24,
-            ParsingErrorKind::ExpectedATagTypeButFound(..) => 25,
-            ParsingErrorKind::ExpectedToBeFollowedByOneOfTheTokens(..) => 26,
+            ParsingErrorKind::UnexpectedEndOfInput => 5,
+            ParsingErrorKind::ExpectedAnIdentifier => 6,
+            ParsingErrorKind::ExpectedAPunctuationMark(..) => 7,
+            ParsingErrorKind::ExpectedAKeyword(..) => 8,
+            ParsingErrorKind::ExpectedAStringValue => 9,
+            ParsingErrorKind::ExpectedANumericValue => 10,
+            ParsingErrorKind::UnknownStaticMethod(..) => 11,
+            ParsingErrorKind::UnexpectedStatementAfterFinalExpression => 12,
+            ParsingErrorKind::ExpectedStatementOrExpression { .. } => 13,
+            ParsingErrorKind::UnexpectedTokenAfterFinalExpression { .. } => 14,
+            ParsingErrorKind::ExpectedATagTypeButFound(..) => 15,
+            ParsingErrorKind::ExpectedToBeFollowedByOneOfTheTokens(..) => 16,
+            ParsingErrorKind::ExternFnCannotBeGeneric => 17,
         }
     }
 }

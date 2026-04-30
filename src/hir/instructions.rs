@@ -167,6 +167,19 @@ pub struct GenericApplyInstr {
     pub type_args: Vec<TypeAnnotation>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuiltinFunction {
+    StringConcat,
+}
+
+#[derive(Clone, Debug)]
+pub struct CallBuiltinInstr {
+    pub builtin: BuiltinFunction,
+    pub args: Vec<InstrId>,
+    pub memory_in: MemoryId,
+    pub memory_out: MemoryId,
+}
+
 #[derive(Clone, Debug)]
 pub enum InstructionKind {
     MakeLiteral(MakeLiteralKind),
@@ -182,6 +195,7 @@ pub enum InstructionKind {
     StructInit(StructInitInstr),
     ListInit(ListInitInstr),
     GenericApply(GenericApplyInstr),
+    CallBuiltin(CallBuiltinInstr),
 }
 
 #[derive(Clone, Debug)]

@@ -20,6 +20,15 @@ pub struct Param {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ExternFnDecl {
+    pub id: DeclarationId,
+    pub documentation: Option<DocAnnotation>,
+    pub identifier: IdentifierNode,
+    pub params: Vec<Param>,
+    pub return_type: TypeAnnotation,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct FnDecl {
     pub id: DeclarationId,
     pub documentation: Option<DocAnnotation>,
@@ -53,6 +62,7 @@ pub struct VarDecl {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Declaration {
     TypeAlias(TypeAliasDecl),
+    ExternFn(ExternFnDecl),
     Fn(FnDecl),
     Var(VarDecl),
     Param(Param),

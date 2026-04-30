@@ -240,6 +240,14 @@ impl Compiler {
                                 )),
                             ])
                         }
+                        ParsingErrorKind::ExternFnCannotBeGeneric => diag
+                            .with_message(
+                                "Extern functions cannot have generic parameters",
+                            )
+                            .with_labels(vec![Label::primary(file_id, range)
+                                .with_message(
+                                    "Extern functions cannot have generic parameters",
+                                )]),
                     }
                 }
 
