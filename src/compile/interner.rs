@@ -203,6 +203,26 @@ impl TypeInterner {
     pub fn never(&self) -> TypeId {
         self.intern(&Type::Never)
     }
+
+    pub fn widen_literal(&self, id: TypeId) -> TypeId {
+        match self.resolve(id) {
+            Type::Bool(Some(_)) => self.bool(None),
+            Type::I8(Some(_)) => self.i8(None),
+            Type::I16(Some(_)) => self.i16(None),
+            Type::I32(Some(_)) => self.i32(None),
+            Type::I64(Some(_)) => self.i64(None),
+            Type::ISize(Some(_)) => self.isize(None),
+            Type::U8(Some(_)) => self.u8(None),
+            Type::U16(Some(_)) => self.u16(None),
+            Type::U32(Some(_)) => self.u32(None),
+            Type::U64(Some(_)) => self.u64(None),
+            Type::USize(Some(_)) => self.usize(None),
+            Type::F32(Some(_)) => self.f32(None),
+            Type::F64(Some(_)) => self.f64(None),
+            Type::Struct(StructKind::String(Some(_))) => self.string(None),
+            _ => id,
+        }
+    }
 }
 
 impl TypeInterner {
@@ -388,27 +408,45 @@ impl TypeInterner {
         }
 
         let result = match self.resolve(target) {
-            Type::Bool(lit) => lit.map_or("bool", |v| &v.to_string()).to_string(),
-            Type::U8(lit) => format!("{}{}", lit.map_or("", |v| v), "u8"),
-            Type::U16(lit) => format!("{}{}", lit.map_or("", |v| v), "u16"),
-            Type::U32(lit) => format!("{}{}", lit.map_or("", |v| v), "u32"),
-            Type::U64(lit) => format!("{}{}", lit.map_or("", |v| v), "u64"),
-            Type::USize(lit) => {
-                format!("{}{}", lit.map_or("", |v| &v.to_string()), "usize")
-            }
-            Type::ISize(lit) => {
-                format!("{}{}", lit.map_or("", |v| &v.to_string()), "isize")
-            }
-            Type::I8(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i8"),
-            Type::I16(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i16"),
-            Type::I32(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i32"),
-            Type::I64(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "i64"),
-            Type::F32(lit) => {
-                format!("{}{}", lit.map_or("", |v| &v.0.to_string()), "f32")
-            }
-            Type::F64(lit) => {
-                format!("{}{}", lit.map_or("", |v| &v.0.to_string()), "f64")
-            }
+            Type::Bool(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "bool".to_string()),
+            Type::U8(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "u8".to_string()),
+            Type::U16(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "u16".to_string()),
+            Type::U32(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "u32".to_string()),
+            Type::U64(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "u64".to_string()),
+            Type::USize(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "usize".to_string()),
+            Type::ISize(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "isize".to_string()),
+            Type::I8(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "i8".to_string()),
+            Type::I16(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "i16".to_string()),
+            Type::I32(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "i32".to_string()),
+            Type::I64(lit) => lit
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "i64".to_string()),
+            Type::F32(lit) => lit
+                .map(|v| v.0.to_string())
+                .unwrap_or_else(|| "f32".to_string()),
+            Type::F64(lit) => lit
+                .map(|v| v.0.to_string())
+                .unwrap_or_else(|| "f64".to_string()),
             Type::Struct(s) => match s {
                 StructKind::UserDefined(checked_params) => {
                     self.struct_to_string(&checked_params, visited_set)
@@ -419,7 +457,9 @@ impl TypeInterner {
                 StructKind::ListHeader(item_type) => {
                     self.list_to_string(item_type, visited_set)
                 }
-                StructKind::String(lit) => String::from("string"),
+                StructKind::String(lit) => lit
+                    .map(|id| format!("\"{}\"", STRING_INTERNER.resolve(id)))
+                    .unwrap_or_else(|| "string".to_string()),
             },
             Type::Fn(fn_type) => self.fn_signature_to_string(fn_type, visited_set),
             Type::Pointer(to) => {
