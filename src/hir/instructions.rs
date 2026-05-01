@@ -58,9 +58,10 @@ pub struct CastInstr {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Place {
     Var(DeclarationId),
-    Expr(InstrId),
     Field(Box<Place>, IdentifierNode),
+    Index(Box<Place>, InstrId),
     Deref(Box<Place>),
+    Expr(InstrId),
 }
 
 #[derive(Clone, Debug)]

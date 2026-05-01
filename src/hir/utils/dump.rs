@@ -104,6 +104,9 @@ fn format_place(place: &Place) -> String {
                 STRING_INTERNER.resolve(name.name)
             )
         }
+        Place::Index(base, instr_id) => {
+            format!("{}[v{}]", format_place(base), instr_id.0)
+        }
         Place::Deref(base) => format!("*{}", format_place(base)),
     }
 }

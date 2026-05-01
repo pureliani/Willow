@@ -7,6 +7,7 @@ pub mod fn_call;
 pub mod generic_apply;
 pub mod identifier;
 pub mod r#if;
+pub mod index;
 pub mod is_type;
 pub mod list_literal;
 pub mod or;
@@ -77,6 +78,7 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::Struct(fields) => self.build_struct_init_expr(span, fields, false),
             ExprKind::List(items) => self.build_list_literal_expr(span, items),
             ExprKind::Access { left, field } => self.build_access_expr(*left, field),
+
             ExprKind::StaticAccess { left, field } => {
                 self.build_static_access_expr(*left, field)
             }
@@ -102,6 +104,9 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::TemplateString(parts) => self.build_template_expr(parts, span),
             ExprKind::GenericApply { left, type_args } => {
                 self.build_generic_apply_expr(*left, type_args, span)
+            }
+            ExprKind::Index { left, index } => {
+                self.build_index_expr(*left, *index, expr.span)
             }
         }
     }

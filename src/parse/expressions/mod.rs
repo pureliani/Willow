@@ -53,6 +53,7 @@ fn suffix_bp(token_kind: &TokenKind) -> Option<(u8, ())> {
 
     let priority = match token_kind {
         Punctuation(LParen) => (14, ()),    // fn call
+        Punctuation(LBracket) => (14, ()),  // array indexing
         Punctuation(Dot) => (14, ()),       // member access
         Punctuation(DoubleCol) => (14, ()), // static member accesses
         Punctuation(Lt) => (14, ()),        // generic instantiation
@@ -222,6 +223,24 @@ impl Parser {
                 let lhs_clone = lhs.clone();
 
                 let new_lhs = match op.kind {
+                    TokenKind::Punctuation(PunctuationKind::LBracket) => {
+                        self.consume_punctuation(PunctuationKind::LBracket)?;
+                        let index = self.parse_expr(0)?;
+                        self.consume_punctuation(PunctuationKind::RBracket)?;
+                        let end_pos = self.tokens[self.offset - 1].span.end;
+
+                        Some(Expr {
+                            kind: ExprKind::Index {
+                                left: Box::new(lhs_clone.clone()),
+                                index: Box::new(index),
+                            },
+                            span: Span {
+                                start: lhs_clone.span.start,
+                                end: end_pos,
+                                path: self.path.clone(),
+                            },
+                        })
+                    }
                     TokenKind::Punctuation(PunctuationKind::Lt) => {
                         self.place_checkpoint();
                         self.advance();

@@ -6,7 +6,7 @@ use std::{
 use crate::{
     globals::STRING_INTERNER,
     hir::types::{
-        checked_type::{CheckedParam, FnType, StructKind, Type},
+        checked_type::{CheckedParam, FnTypeKind, StructKind, Type},
         ordered_float::{OrderedF32, OrderedF64},
     },
     tokenize::{NumberKind, TokenKind},
@@ -389,10 +389,10 @@ impl TypeInterner {
 
         let result = match self.resolve(target) {
             Type::Bool(lit) => lit.map_or("bool", |v| &v.to_string()).to_string(),
-            Type::U8(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u8"),
-            Type::U16(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u16"),
-            Type::U32(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u32"),
-            Type::U64(lit) => format!("{}{}", lit.map_or("", |v| &v.to_string()), "u64"),
+            Type::U8(lit) => format!("{}{}", lit.map_or("", |v| v), "u8"),
+            Type::U16(lit) => format!("{}{}", lit.map_or("", |v| v), "u16"),
+            Type::U32(lit) => format!("{}{}", lit.map_or("", |v| v), "u32"),
+            Type::U64(lit) => format!("{}{}", lit.map_or("", |v| v), "u64"),
             Type::USize(lit) => {
                 format!("{}{}", lit.map_or("", |v| &v.to_string()), "usize")
             }
@@ -421,7 +421,7 @@ impl TypeInterner {
                 }
                 StructKind::String(lit) => String::from("string"),
             },
-            Type::Fn(fn_type) => self.fn_signature_to_string(&fn_type, visited_set),
+            Type::Fn(fn_type) => self.fn_signature_to_string(fn_type, visited_set),
             Type::Pointer(to) => {
                 format!("ptr<{}>", self.to_string_recursive(to, visited_set))
             }
@@ -512,26 +512,32 @@ impl TypeInterner {
 
     fn fn_signature_to_string(
         &self,
-        FnType {
-            params,
-            return_type,
-        }: &FnType,
+        fn_type_kind: FnTypeKind,
         visited_set: &mut HashSet<TypeId>,
     ) -> String {
-        let params_str = params
-            .iter()
-            .map(|p| {
-                format!(
-                    "{}: {}",
-                    STRING_INTERNER.resolve(p.identifier.name),
-                    self.to_string_recursive(p.ty.id, visited_set)
-                )
-            })
-            .collect::<Vec<String>>()
-            .join(", ");
+        match fn_type_kind {
+            FnTypeKind::Direct(declaration_id) => {
+                format!("fn_{}", declaration_id.0)
+            }
+            FnTypeKind::Indirect(signature) => {
+                let params_str = signature
+                    .params
+                    .iter()
+                    .map(|p| {
+                        format!(
+                            "{}: {}",
+                            STRING_INTERNER.resolve(p.identifier.name),
+                            self.to_string_recursive(p.ty.id, visited_set)
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join(", ");
 
-        let return_type_str = self.to_string_recursive(return_type.id, visited_set);
+                let return_type_str =
+                    self.to_string_recursive(signature.return_type.id, visited_set);
 
-        format!("fn({}): {}", params_str, return_type_str)
+                format!("fn({}): {}", params_str, return_type_str)
+            }
+        }
     }
 }
