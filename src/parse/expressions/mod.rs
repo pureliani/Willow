@@ -2,7 +2,6 @@ pub mod parse_codeblock_expr;
 pub mod parse_fn_call_expr;
 pub mod parse_fn_expr;
 pub mod parse_if_expr;
-pub mod parse_list_literal_expr;
 pub mod parse_parenthesized_expr;
 pub mod parse_struct_init_expr;
 pub mod parse_template_expr;
@@ -53,7 +52,6 @@ fn suffix_bp(token_kind: &TokenKind) -> Option<(u8, ())> {
 
     let priority = match token_kind {
         Punctuation(LParen) => (14, ()),    // fn call
-        Punctuation(LBracket) => (14, ()),  // array indexing
         Punctuation(Dot) => (14, ()),       // member access
         Punctuation(DoubleCol) => (14, ()), // static member accesses
         Punctuation(Lt) => (14, ()),        // generic instantiation
@@ -68,15 +66,14 @@ pub fn is_start_of_expr(token_kind: &TokenKind) -> bool {
         TokenKind::Identifier(_)
         | TokenKind::Number(_)
         | TokenKind::String(_)
+        | TokenKind::Keyword(KeywordKind::SelfValue) 
         | TokenKind::Keyword(KeywordKind::Fn)
         | TokenKind::Keyword(KeywordKind::True)
         | TokenKind::Keyword(KeywordKind::False)
         | TokenKind::Keyword(KeywordKind::If)
         | TokenKind::Keyword(KeywordKind::Null)
-        | TokenKind::Punctuation(PunctuationKind::Hash)   // Tag expr
         | TokenKind::Punctuation(PunctuationKind::LParen)   // Parenthesized expr
         | TokenKind::Punctuation(PunctuationKind::LBrace)   // Codeblock or Struct expr
-        | TokenKind::Punctuation(PunctuationKind::LBracket) // List literal
         | TokenKind::Punctuation(PunctuationKind::Minus)    // Negation
         | TokenKind::Punctuation(PunctuationKind::Not)      // Logical NOT
         | TokenKind::Punctuation(PunctuationKind::Backtick) // Template
@@ -92,6 +89,13 @@ impl Parser {
         let token_span = token.span.clone();
 
         let mut lhs = match token.kind {
+            TokenKind::Keyword(KeywordKind::SelfValue) => {
+                let span = self.consume_keyword(KeywordKind::SelfValue)?;
+                Expr {
+                    kind: ExprKind::SelfValue,
+                    span,
+                }
+            }
             TokenKind::Identifier(_) => {
                 let identifier = self.consume_identifier()?;
                 Expr {
@@ -140,9 +144,6 @@ impl Parser {
                                 }
                             })
                     })?
-            }
-            TokenKind::Punctuation(PunctuationKind::LBracket) => {
-                self.parse_list_literal_expr()?
             }
             TokenKind::Punctuation(PunctuationKind::Minus) => {
                 let ((), r_bp) =
@@ -223,24 +224,6 @@ impl Parser {
                 let lhs_clone = lhs.clone();
 
                 let new_lhs = match op.kind {
-                    TokenKind::Punctuation(PunctuationKind::LBracket) => {
-                        self.consume_punctuation(PunctuationKind::LBracket)?;
-                        let index = self.parse_expr(0)?;
-                        self.consume_punctuation(PunctuationKind::RBracket)?;
-                        let end_pos = self.tokens[self.offset - 1].span.end;
-
-                        Some(Expr {
-                            kind: ExprKind::Index {
-                                left: Box::new(lhs_clone.clone()),
-                                index: Box::new(index),
-                            },
-                            span: Span {
-                                start: lhs_clone.span.start,
-                                end: end_pos,
-                                path: self.path.clone(),
-                            },
-                        })
-                    }
                     TokenKind::Punctuation(PunctuationKind::Lt) => {
                         self.place_checkpoint();
                         self.advance();
@@ -310,20 +293,7 @@ impl Parser {
                         let field = self.consume_identifier()?;
                         let field_name = STRING_INTERNER.resolve(field.name);
 
-                        let new_lhs = if field_name == "is" {
-                            // lhs::is(i32)
-                            self.consume_punctuation(PunctuationKind::LParen)?;
-                            let type_ann = self.parse_type_annotation(0)?;
-                            self.consume_punctuation(PunctuationKind::RParen)?;
-
-                            Expr {
-                                kind: ExprKind::IsType {
-                                    left: Box::new(lhs.clone()),
-                                    ty: type_ann,
-                                },
-                                span: self.get_span(start_offset, self.offset - 1)?,
-                            }
-                        } else if field_name == "as" {
+                        let new_lhs = if field_name == "as" {
                             // lhs::as(Type)
                             self.consume_punctuation(PunctuationKind::LParen)?;
                             let target_type = self.parse_type_annotation(0)?;

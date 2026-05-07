@@ -33,11 +33,6 @@ impl<'a> Builder<'a, InBlock> {
                 let base_place = self.build_place(*left)?;
                 Ok(Place::Field(Box::new(base_place), field))
             }
-            ExprKind::Index { left, index } => {
-                let base_place = self.build_place(*left)?;
-                let index_id = self.build_expr(*index);
-                Ok(Place::Index(Box::new(base_place), index_id))
-            }
             _ => {
                 let instr_id = self.build_expr(expr);
                 Ok(Place::Expr(instr_id))

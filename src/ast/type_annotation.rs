@@ -1,40 +1,39 @@
-use crate::{
-    ast::{IdentifierNode, Span},
-    compile::interner::StringId,
-};
+use crate::ast::{expr::Expr, IdentifierNode, Span};
 
 use super::decl::Param;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeAnnotationKind {
-    Never,
     Null,
     Void,
-    Bool(Option<bool>),
-    U8(Option<u8>),
-    U16(Option<u16>),
-    U32(Option<u32>),
-    U64(Option<u64>),
-    I8(Option<i8>),
-    I16(Option<i16>),
-    I32(Option<i32>),
-    I64(Option<i64>),
-    F32(Option<f32>),
-    F64(Option<f64>),
-    ISize(Option<isize>),
-    USize(Option<usize>),
-    String(Option<StringId>),
+    Bool,
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+    ISize,
+    USize,
     Identifier(IdentifierNode),
     GenericApply {
         left: Box<TypeAnnotation>,
         args: Vec<TypeAnnotation>,
     },
     Struct(Vec<Param>),
-    Union(Vec<TypeAnnotation>),
-    List(Box<TypeAnnotation>),
+    Pointer(Box<TypeAnnotation>),
+    MutPointer(Box<TypeAnnotation>),
     FnType {
         params: Vec<Param>,
         return_type: Box<TypeAnnotation>,
+    },
+    Refinement {
+        base: Box<TypeAnnotation>,
+        condition: Box<Expr>,
     },
 }
 

@@ -1,8 +1,6 @@
 use crate::{
     ast::{DeclarationId, IdentifierNode, Span},
-    compile::interner::{StringId, TypeId, TypeInterner},
-    globals::COMMON_IDENTIFIERS,
-    hir::types::ordered_float::{OrderedF32, OrderedF64},
+    compile::interner::{StringId, TypeId},
 };
 use std::{cmp::Ordering, collections::BTreeSet, hash::Hash};
 
@@ -34,56 +32,18 @@ pub struct FnType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum StructKind {
-    // packed
-    UserDefined(Vec<CheckedParam>),
+pub struct StructTypeDefinition(pub Vec<CheckedParam>);
 
-    /// { id: u32, value: TaglessUnion }
-    TaggedUnion(BTreeSet<TypeId>),
-
-    /// { len: usize, cap: usize, ptr: ptr<T> }
-    ListHeader(TypeId),
-
-    String(Option<StringId>),
-}
-
-impl StructKind {
-    pub fn fields(&self, t: &TypeInterner) -> Vec<(StringId, TypeId)> {
-        match self {
-            StructKind::UserDefined(params) => params
-                .iter()
-                .map(|p| (p.identifier.name, p.ty.id))
-                .collect(),
-
-            StructKind::ListHeader(elem_ty_id) => vec![
-                (COMMON_IDENTIFIERS.len, t.usize(None)),
-                (COMMON_IDENTIFIERS.cap, t.usize(None)),
-                (COMMON_IDENTIFIERS.ptr, t.ptr(*elem_ty_id)),
-            ],
-
-            StructKind::String(literal) => {
-                if literal.is_none() {
-                    vec![(COMMON_IDENTIFIERS.len, t.usize(None))]
-                } else {
-                    vec![]
-                }
-            }
-            StructKind::TaggedUnion(variants) => vec![
-                (COMMON_IDENTIFIERS.id, t.u32(None)),
-                (
-                    COMMON_IDENTIFIERS.val,
-                    t.intern(&Type::TaglessUnion(variants.clone())),
-                ),
-            ],
-        }
+impl StructTypeDefinition {
+    pub fn fields(&self) -> Vec<(StringId, TypeId)> {
+        self.0
+            .iter()
+            .map(|p| (p.identifier.name, p.ty.id))
+            .collect()
     }
 
-    pub fn get_field(
-        &self,
-        t: &TypeInterner,
-        name: &StringId,
-    ) -> Option<(usize, TypeId)> {
-        self.fields(t)
+    pub fn get_field(&self, name: &StringId) -> Option<(usize, TypeId)> {
+        self.fields()
             .into_iter()
             .enumerate()
             .find(|(_, (field_name, _))| field_name == name)
@@ -100,32 +60,30 @@ pub enum FnTypeKind {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Type {
     Void,
-    Never,
     Unknown,
     Null,
-    Bool(Option<bool>),
-    U8(Option<u8>),
-    U16(Option<u16>),
-    U32(Option<u32>),
-    U64(Option<u64>),
-    USize(Option<usize>),
-    ISize(Option<isize>),
-    I8(Option<i8>),
-    I16(Option<i16>),
-    I32(Option<i32>),
-    I64(Option<i64>),
-    F32(Option<OrderedF32>),
-    F64(Option<OrderedF64>),
+    Bool,
+    U8,
+    U16,
+    U32,
+    U64,
+    USize,
+    ISize,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
     Fn(FnTypeKind),
-
     Pointer(TypeId),
-    Struct(StructKind),
-    TaglessUnion(BTreeSet<TypeId>),
-
+    MutPointer(TypeId),
+    Struct(StructTypeDefinition),
     GenericParam {
         identifier: IdentifierNode,
         extends: Option<TypeId>,
     },
+    TaglessUnion(BTreeSet<TypeId>),
 }
 
 #[derive(Clone, Debug)]

@@ -78,10 +78,6 @@ pub enum ExprKind {
         left: Box<Expr>,
         field: IdentifierNode,
     },
-    Index {
-        left: Box<Expr>,
-        index: Box<Expr>,
-    },
     StaticAccess {
         left: Box<Expr>,
         field: IdentifierNode,
@@ -89,10 +85,6 @@ pub enum ExprKind {
     TypeCast {
         left: Box<Expr>,
         target: TypeAnnotation,
-    },
-    IsType {
-        left: Box<Expr>,
-        ty: TypeAnnotation,
     },
     FnCall {
         left: Box<Expr>,
@@ -112,8 +104,8 @@ pub enum ExprKind {
         branches: Vec<(Box<Expr>, BlockContents)>,
         else_branch: Option<BlockContents>,
     },
-    List(Vec<Expr>),
     CodeBlock(BlockContents),
+    SelfValue,
 }
 
 #[derive(Clone, Debug, PartialEq)]

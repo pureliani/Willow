@@ -32,13 +32,6 @@ impl<'a> Builder<'a, InModule> {
             return;
         }
 
-        let path_str = &path.value;
-
-        if path_str == "std" || path_str.starts_with("std/") {
-            self.build_std_import(path_str, items, span);
-            return;
-        }
-
         let mut target_path_buf = PathBuf::from(&*self.context.path.0);
         target_path_buf.pop();
         target_path_buf.push(&path.value);

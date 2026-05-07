@@ -149,8 +149,10 @@ pub enum KeywordKind {
     Fn,
     String,
     Null,
-    Never,
+    Mut,
     Extends,
+    Where,
+    SelfValue,
 }
 
 impl KeywordKind {
@@ -183,8 +185,10 @@ impl KeywordKind {
             KeywordKind::Fn => "fn",
             KeywordKind::String => "string",
             KeywordKind::Null => "null",
-            KeywordKind::Never => "never",
+            KeywordKind::Mut => "mut",
             KeywordKind::Extends => "extends",
+            KeywordKind::Where => "where",
+            KeywordKind::SelfValue => "self",
         })
     }
 }
@@ -753,8 +757,10 @@ fn is_keyword(identifier: &str) -> Option<KeywordKind> {
         "f64" => Some(KeywordKind::F64),
         "string" => Some(KeywordKind::String),
         "null" => Some(KeywordKind::Null),
-        "never" => Some(KeywordKind::Never),
+        "mut" => Some(KeywordKind::Mut),
         "extends" => Some(KeywordKind::Extends),
+        "where" => Some(KeywordKind::Where),
+        "self" => Some(KeywordKind::SelfValue),
         _ => None,
     }
 }

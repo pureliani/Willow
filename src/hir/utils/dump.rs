@@ -247,9 +247,6 @@ pub fn dump_instruction(instr_id: InstrId, cfg: &FunctionCFG, out: &mut String) 
                 .collect();
             writeln!(out, "phi {}", srcs.join(", ")).unwrap();
         }
-        InstructionKind::IsType(i) => {
-            writeln!(out, "is_type v{} <type>", i.src.0).unwrap();
-        }
         InstructionKind::Param(idx) => {
             writeln!(out, "param {}", idx).unwrap();
         }

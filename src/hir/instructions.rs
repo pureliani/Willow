@@ -157,12 +157,6 @@ pub struct ListInitInstr {
 }
 
 #[derive(Clone, Debug)]
-pub struct IsTypeInstr {
-    pub src: InstrId,
-    pub target: TypeAnnotation,
-}
-
-#[derive(Clone, Debug)]
 pub struct GenericApplyInstr {
     pub func: InstrId,
     pub type_args: Vec<TypeAnnotation>,
@@ -191,7 +185,6 @@ pub enum InstructionKind {
     Call(CallInstr),
     Select(SelectInstr),
     Phi(PhiInstr),
-    IsType(IsTypeInstr),
     Param(usize),
     StructInit(StructInitInstr),
     ListInit(ListInitInstr),

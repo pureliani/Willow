@@ -18,7 +18,6 @@ pub mod control_flow;
 pub mod memory;
 pub mod module;
 pub mod program;
-pub mod std_lib;
 
 pub struct Program {
     pub modules: BTreeMap<ModulePath, Module>,

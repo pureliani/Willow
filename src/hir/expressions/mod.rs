@@ -8,8 +8,6 @@ pub mod generic_apply;
 pub mod identifier;
 pub mod r#if;
 pub mod index;
-pub mod is_type;
-pub mod list_literal;
 pub mod or;
 pub mod static_access;
 pub mod string;
@@ -19,9 +17,14 @@ pub mod typecast;
 pub mod unary;
 
 use crate::{
-    ast::expr::{Expr, ExprKind},
+    ast::{
+        expr::{Expr, ExprKind},
+        IdentifierNode,
+    },
+    globals::STRING_INTERNER,
     hir::{
         builders::{Builder, InBlock},
+        errors::{SemanticError, SemanticErrorKind},
         expressions::r#if::IfContext,
         instructions::{BinaryOpKind, InstrId, UnaryOpKind},
     },
@@ -76,7 +79,6 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::Number(number_kind) => self.emit_number(number_kind, expr.span),
             ExprKind::String(string_node) => self.build_string_literal(string_node),
             ExprKind::Struct(fields) => self.build_struct_init_expr(span, fields, false),
-            ExprKind::List(items) => self.build_list_literal_expr(span, items),
             ExprKind::Access { left, field } => self.build_access_expr(*left, field),
 
             ExprKind::StaticAccess { left, field } => {
@@ -97,17 +99,18 @@ impl<'a> Builder<'a, InBlock> {
             ExprKind::TypeCast { left, target } => {
                 self.build_typecast_expr(*left, target, expr.span)
             }
-            ExprKind::IsType { left, ty } => {
-                self.build_is_type_expr(*left, ty, expr.span)
-            }
             ExprKind::Null => self.emit_null(expr.span),
             ExprKind::TemplateString(parts) => self.build_template_expr(parts, span),
             ExprKind::GenericApply { left, type_args } => {
                 self.build_generic_apply_expr(*left, type_args, span)
             }
-            ExprKind::Index { left, index } => {
-                self.build_index_expr(*left, *index, expr.span)
-            }
+            ExprKind::SelfValue => self.report_error_and_get_poison(SemanticError {
+                kind: SemanticErrorKind::UndeclaredIdentifier(IdentifierNode {
+                    name: STRING_INTERNER.intern("self"),
+                    span: span.clone(),
+                }),
+                span,
+            }),
         }
     }
 }

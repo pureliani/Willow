@@ -1,7 +1,7 @@
 use crate::{
     compile::interner::TypeInterner,
     globals::STRING_INTERNER,
-    hir::types::checked_type::{CheckedParam, FnTypeKind, StructKind, Type},
+    hir::types::checked_type::{CheckedParam, FnTypeKind, Type},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,105 +27,26 @@ pub fn get_layout_of(
 
     match ty {
         Type::Void => zst_layout,
-        Type::Never => zst_layout,
         Type::Unknown => zst_layout,
         Type::Null => zst_layout,
-        Type::Bool(lit) => {
-            if lit.is_none() {
-                Layout::new(1, 1)
-            } else {
-                zst_layout
-            }
-        }
-        Type::U8(lit) => {
-            if lit.is_none() {
-                Layout::new(1, 1)
-            } else {
-                zst_layout
-            }
-        }
-        Type::I8(lit) => {
-            if lit.is_none() {
-                Layout::new(1, 1)
-            } else {
-                zst_layout
-            }
-        }
-        Type::U16(lit) => {
-            if lit.is_none() {
-                Layout::new(2, 2)
-            } else {
-                zst_layout
-            }
-        }
-        Type::I16(lit) => {
-            if lit.is_none() {
-                Layout::new(2, 2)
-            } else {
-                zst_layout
-            }
-        }
-        Type::U32(lit) => {
-            if lit.is_none() {
-                Layout::new(4, 4)
-            } else {
-                zst_layout
-            }
-        }
-        Type::I32(lit) => {
-            if lit.is_none() {
-                Layout::new(4, 4)
-            } else {
-                zst_layout
-            }
-        }
-        Type::F32(lit) => {
-            if lit.is_none() {
-                Layout::new(4, 4)
-            } else {
-                zst_layout
-            }
-        }
-        Type::U64(lit) => {
-            if lit.is_none() {
-                Layout::new(8, 8)
-            } else {
-                zst_layout
-            }
-        }
-        Type::I64(lit) => {
-            if lit.is_none() {
-                Layout::new(8, 8)
-            } else {
-                zst_layout
-            }
-        }
-        Type::F64(lit) => {
-            if lit.is_none() {
-                Layout::new(8, 8)
-            } else {
-                zst_layout
-            }
-        }
-        Type::USize(lit) => {
-            if lit.is_none() {
-                Layout::new(ptr_size, ptr_align)
-            } else {
-                zst_layout
-            }
-        }
-        Type::ISize(lit) => {
-            if lit.is_none() {
-                Layout::new(ptr_size, ptr_align)
-            } else {
-                zst_layout
-            }
-        }
+        Type::Bool => Layout::new(1, 1),
+        Type::U8 => Layout::new(1, 1),
+        Type::I8 => Layout::new(1, 1),
+        Type::U16 => Layout::new(2, 2),
+        Type::I16 => Layout::new(2, 2),
+        Type::U32 => Layout::new(4, 4),
+        Type::I32 => Layout::new(4, 4),
+        Type::F32 => Layout::new(4, 4),
+        Type::U64 => Layout::new(8, 8),
+        Type::I64 => Layout::new(8, 8),
+        Type::F64 => Layout::new(8, 8),
+        Type::USize => Layout::new(ptr_size, ptr_align),
+        Type::ISize => Layout::new(ptr_size, ptr_align),
         Type::Fn(fn_type_kind) => match fn_type_kind {
             FnTypeKind::Direct(_) => Layout::new(0, 1),
             FnTypeKind::Indirect(_) => Layout::new(ptr_size, ptr_align),
         },
-        Type::Pointer(inner_id) => {
+        Type::Pointer(inner_id) | Type::MutPointer(inner_id) => {
             let inner_ty = interner.resolve(*inner_id);
             let inner_layout = get_layout_of(&inner_ty, interner, ptr_size, ptr_align);
 
@@ -153,7 +74,7 @@ pub fn get_layout_of(
             Layout::new(max_size + padding, max_align)
         }
         Type::Struct(s) => {
-            let fields = s.fields(interner);
+            let fields = s.fields();
             let types: Vec<Type> = fields
                 .into_iter()
                 .map(|(_, id)| interner.resolve(id))
@@ -202,27 +123,13 @@ fn calculate_fields_layout(
     Layout::new(total_size, max_alignment)
 }
 
-pub fn pack_struct(
-    struct_kind: StructKind,
+fn pack_struct(
+    fields: &[CheckedParam],
     interner: &TypeInterner,
     ptr_size: usize,
     ptr_align: usize,
-) -> StructKind {
-    match struct_kind {
-        StructKind::UserDefined(mut fields) => {
-            sort_fields(&mut fields, interner, ptr_size, ptr_align);
-            StructKind::UserDefined(fields)
-        }
-        other => other,
-    }
-}
-
-fn sort_fields(
-    fields: &mut [CheckedParam],
-    interner: &TypeInterner,
-    ptr_size: usize,
-    ptr_align: usize,
-) {
+) -> Vec<CheckedParam> {
+    let mut fields: Vec<CheckedParam> = fields.to_vec();
     fields.sort_by(|field_a, field_b| {
         let ty_a = interner.resolve(field_a.ty.id);
         let ty_b = interner.resolve(field_b.ty.id);
@@ -237,4 +144,5 @@ fn sort_fields(
             name_a.cmp(&name_b)
         })
     });
+    fields
 }

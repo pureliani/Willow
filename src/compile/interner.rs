@@ -5,11 +5,8 @@ use std::{
 
 use crate::{
     globals::STRING_INTERNER,
-    hir::types::{
-        checked_type::{CheckedParam, FnTypeKind, StructKind, Type},
-        ordered_float::{OrderedF32, OrderedF64},
-    },
-    tokenize::{NumberKind, TokenKind},
+    hir::types::checked_type::{CheckedParam, FnTypeKind, Type},
+    tokenize::TokenKind,
 };
 
 pub type GenericSubstitutions = HashMap<StringId, TypeId>;
@@ -127,65 +124,60 @@ impl TypeInterner {
 }
 
 impl TypeInterner {
-    pub fn bool(&self, literal: Option<bool>) -> TypeId {
-        self.intern(&Type::Bool(literal))
+    pub fn bool(&self) -> TypeId {
+        self.intern(&Type::Bool)
     }
 
-    pub fn i8(&self, literal: Option<i8>) -> TypeId {
-        self.intern(&Type::I8(literal))
+    pub fn i8(&self) -> TypeId {
+        self.intern(&Type::I8)
     }
 
-    pub fn i16(&self, literal: Option<i16>) -> TypeId {
-        self.intern(&Type::I16(literal))
+    pub fn i16(&self) -> TypeId {
+        self.intern(&Type::I16)
     }
 
-    pub fn i32(&self, literal: Option<i32>) -> TypeId {
-        self.intern(&Type::I32(literal))
+    pub fn i32(&self) -> TypeId {
+        self.intern(&Type::I32)
     }
 
-    pub fn i64(&self, literal: Option<i64>) -> TypeId {
-        self.intern(&Type::I64(literal))
+    pub fn i64(&self) -> TypeId {
+        self.intern(&Type::I64)
     }
 
-    pub fn isize(&self, literal: Option<isize>) -> TypeId {
-        self.intern(&Type::ISize(literal))
+    pub fn isize(&self) -> TypeId {
+        self.intern(&Type::ISize)
     }
 
-    pub fn u8(&self, literal: Option<u8>) -> TypeId {
-        self.intern(&Type::U8(literal))
+    pub fn u8(&self) -> TypeId {
+        self.intern(&Type::U8)
     }
 
-    pub fn u16(&self, literal: Option<u16>) -> TypeId {
-        self.intern(&Type::U16(literal))
+    pub fn u16(&self) -> TypeId {
+        self.intern(&Type::U16)
     }
 
-    pub fn u32(&self, literal: Option<u32>) -> TypeId {
-        self.intern(&Type::U32(literal))
+    pub fn u32(&self) -> TypeId {
+        self.intern(&Type::U32)
     }
 
-    pub fn u64(&self, literal: Option<u64>) -> TypeId {
-        self.intern(&Type::U64(literal))
+    pub fn u64(&self) -> TypeId {
+        self.intern(&Type::U64)
     }
 
-    pub fn usize(&self, literal: Option<usize>) -> TypeId {
-        self.intern(&Type::USize(literal))
+    pub fn usize(&self) -> TypeId {
+        self.intern(&Type::USize)
     }
 
     pub fn ptr(&self, to: TypeId) -> TypeId {
         self.intern(&Type::Pointer(to))
     }
 
-    pub fn f32(&self, literal: Option<OrderedF32>) -> TypeId {
-        self.intern(&Type::F32(literal))
+    pub fn f32(&self) -> TypeId {
+        self.intern(&Type::F32)
     }
 
-    pub fn f64(&self, literal: Option<OrderedF64>) -> TypeId {
-        self.intern(&Type::F64(literal))
-    }
-
-    pub fn string(&self, literal: Option<StringId>) -> TypeId {
-        let header_ty = self.intern(&Type::Struct(StructKind::String(literal)));
-        self.ptr(header_ty)
+    pub fn f64(&self) -> TypeId {
+        self.intern(&Type::F64)
     }
 
     pub fn unknown(&self) -> TypeId {
@@ -198,30 +190,6 @@ impl TypeInterner {
 
     pub fn void(&self) -> TypeId {
         self.intern(&Type::Void)
-    }
-
-    pub fn never(&self) -> TypeId {
-        self.intern(&Type::Never)
-    }
-
-    pub fn widen_literal(&self, id: TypeId) -> TypeId {
-        match self.resolve(id) {
-            Type::Bool(Some(_)) => self.bool(None),
-            Type::I8(Some(_)) => self.i8(None),
-            Type::I16(Some(_)) => self.i16(None),
-            Type::I32(Some(_)) => self.i32(None),
-            Type::I64(Some(_)) => self.i64(None),
-            Type::ISize(Some(_)) => self.isize(None),
-            Type::U8(Some(_)) => self.u8(None),
-            Type::U16(Some(_)) => self.u16(None),
-            Type::U32(Some(_)) => self.u32(None),
-            Type::U64(Some(_)) => self.u64(None),
-            Type::USize(Some(_)) => self.usize(None),
-            Type::F32(Some(_)) => self.f32(None),
-            Type::F64(Some(_)) => self.f64(None),
-            Type::Struct(StructKind::String(Some(_))) => self.string(None),
-            _ => id,
-        }
     }
 }
 
@@ -244,105 +212,17 @@ impl TypeInterner {
         panic!("INTERNAL COMPILER ERROR: Called unwrap_ptr on non-pointer type")
     }
 
-    pub fn from_number_kind(&self, val: &NumberKind) -> TypeId {
-        match *val {
-            NumberKind::I8(v) => self.i8(Some(v)),
-            NumberKind::I16(v) => self.i16(Some(v)),
-            NumberKind::I32(v) => self.i32(Some(v)),
-            NumberKind::I64(v) => self.i64(Some(v)),
-            NumberKind::ISize(v) => self.isize(Some(v)),
-            NumberKind::U8(v) => self.u8(Some(v)),
-            NumberKind::U16(v) => self.u16(Some(v)),
-            NumberKind::U32(v) => self.u32(Some(v)),
-            NumberKind::U64(v) => self.u64(Some(v)),
-            NumberKind::USize(v) => self.usize(Some(v)),
-            NumberKind::F32(v) => self.f32(Some(OrderedF32(v))),
-            NumberKind::F64(v) => self.f64(Some(OrderedF64(v))),
-        }
-    }
-
-    pub fn make_union(&self, types: impl IntoIterator<Item = TypeId>) -> TypeId {
-        let mut flat = BTreeSet::new();
-
-        for ty_id in types {
-            let ty = self.resolve(ty_id);
-
-            if matches!(ty, Type::Never) {
-                continue;
-            }
-
-            if let Type::Struct(StructKind::TaggedUnion(variants)) = ty {
-                flat.extend(variants);
-            } else {
-                flat.insert(ty_id);
-            }
-        }
-
-        if flat.is_empty() {
-            return self.intern(&Type::Never);
-        }
-
-        if flat.len() == 1 {
-            return *flat.iter().next().unwrap();
-        }
-
-        self.intern(&Type::Struct(StructKind::TaggedUnion(flat)))
-    }
-
-    pub fn union(&self, a: TypeId, b: TypeId) -> TypeId {
-        self.make_union(vec![a, b])
-    }
-
-    pub fn union_intersect(&self, a: TypeId, b: TypeId) -> TypeId {
-        let s1 = self.as_union_set(a);
-        let s2 = self.as_union_set(b);
-
-        let result_types = s1.intersection(&s2).copied().collect::<Vec<_>>();
-
-        self.make_union(result_types)
-    }
-
-    pub fn union_subtract(&self, a: TypeId, b: TypeId) -> TypeId {
-        let mut s1 = self.as_union_set(a);
-        let s2 = self.as_union_set(b);
-
-        for t in s2 {
-            s1.remove(&t);
-        }
-
-        self.make_union(s1)
-    }
-
-    fn as_union_set(&self, ty: TypeId) -> BTreeSet<TypeId> {
-        if ty == self.never() {
-            return BTreeSet::new();
-        }
-        if let Type::Struct(StructKind::TaggedUnion(variants)) = self.resolve(ty) {
-            return variants;
-        }
-
-        BTreeSet::from([ty])
-    }
-
-    pub fn get_union_variants(&self, ty: TypeId) -> Option<BTreeSet<TypeId>> {
-        if let Type::Struct(StructKind::TaggedUnion(variants)) = self.resolve(ty) {
-            Some(variants.clone())
-        } else {
-            None
-        }
-    }
-
     pub fn get_numeric_type_rank(&self, id: TypeId) -> Option<i32> {
         use Type::*;
         let ty = self.resolve(id);
 
         match ty {
-            I8(_) | U8(_) => Some(1),
-            I16(_) | U16(_) => Some(2),
-            I32(_) | U32(_) | ISize(_) | USize(_) => Some(3),
-            I64(_) | U64(_) => Some(4),
-            F32(_) => Some(5),
-            F64(_) => Some(6),
+            I8 | U8 => Some(1),
+            I16 | U16 => Some(2),
+            I32 | U32 | ISize | USize => Some(3),
+            I64 | U64 => Some(4),
+            F32 => Some(5),
+            F64 => Some(6),
             _ => None,
         }
     }
@@ -351,7 +231,7 @@ impl TypeInterner {
         use Type::*;
         let ty = self.resolve(id);
 
-        matches!(ty, F32(_) | F64(_))
+        matches!(ty, F32 | F64)
     }
 
     pub fn is_integer(&self, id: TypeId) -> bool {
@@ -360,26 +240,14 @@ impl TypeInterner {
 
         matches!(
             ty,
-            I8(_)
-                | I16(_)
-                | I32(_)
-                | I64(_)
-                | U8(_)
-                | U16(_)
-                | U32(_)
-                | U64(_)
-                | ISize(_)
-                | USize(_)
+            I8 | I16 | I32 | I64 | U8 | U16 | U32 | U64 | ISize | USize
         )
     }
 
     pub fn is_signed(&self, id: TypeId) -> bool {
         use Type::*;
         let ty = self.resolve(id);
-        matches!(
-            ty,
-            I8(_) | I16(_) | I32(_) | I64(_) | ISize(_) | F32(_) | F64(_)
-        )
+        matches!(ty, I8 | I16 | I32 | I64 | ISize | F32 | F64)
     }
 
     pub fn is_pointer(&self, id: TypeId) -> bool {
@@ -388,7 +256,7 @@ impl TypeInterner {
 
     pub fn is_bool(&self, id: TypeId) -> bool {
         let ty = self.resolve(id);
-        matches!(ty, Type::Bool(_))
+        matches!(ty, Type::Bool)
     }
 }
 
@@ -408,66 +276,22 @@ impl TypeInterner {
         }
 
         let result = match self.resolve(target) {
-            Type::Bool(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "bool".to_string()),
-            Type::U8(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "u8".to_string()),
-            Type::U16(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "u16".to_string()),
-            Type::U32(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "u32".to_string()),
-            Type::U64(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "u64".to_string()),
-            Type::USize(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "usize".to_string()),
-            Type::ISize(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "isize".to_string()),
-            Type::I8(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "i8".to_string()),
-            Type::I16(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "i16".to_string()),
-            Type::I32(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "i32".to_string()),
-            Type::I64(lit) => lit
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| "i64".to_string()),
-            Type::F32(lit) => lit
-                .map(|v| v.0.to_string())
-                .unwrap_or_else(|| "f32".to_string()),
-            Type::F64(lit) => lit
-                .map(|v| v.0.to_string())
-                .unwrap_or_else(|| "f64".to_string()),
-            Type::Struct(s) => match s {
-                StructKind::UserDefined(checked_params) => {
-                    self.struct_to_string(&checked_params, visited_set)
-                }
-                StructKind::TaggedUnion(variants) => {
-                    self.union_variants_to_string(&variants, visited_set, true)
-                }
-                StructKind::ListHeader(item_type) => {
-                    self.list_to_string(item_type, visited_set)
-                }
-                StructKind::String(lit) => lit
-                    .map(|id| format!("\"{}\"", STRING_INTERNER.resolve(id)))
-                    .unwrap_or_else(|| "string".to_string()),
-            },
+            Type::Bool => "bool".to_string(),
+            Type::U8 => "u8".to_string(),
+            Type::U16 => "u16".to_string(),
+            Type::U32 => "u32".to_string(),
+            Type::U64 => "u64".to_string(),
+            Type::USize => "usize".to_string(),
+            Type::ISize => "isize".to_string(),
+            Type::I8 => "i8".to_string(),
+            Type::I16 => "i16".to_string(),
+            Type::I32 => "i32".to_string(),
+            Type::I64 => "i64".to_string(),
+            Type::F32 => "f32".to_string(),
+            Type::F64 => "f64".to_string(),
+
+            Type::Struct(s) => self.struct_to_string(&s.0, visited_set),
             Type::Fn(fn_type) => self.fn_signature_to_string(fn_type, visited_set),
-            Type::Pointer(to) => {
-                format!("ptr<{}>", self.to_string_recursive(to, visited_set))
-            }
-            Type::TaglessUnion(variants) => {
-                self.union_variants_to_string(&variants, visited_set, false)
-            }
             Type::GenericParam {
                 identifier,
                 extends,
@@ -484,9 +308,17 @@ impl TypeInterner {
                 }
             }
             Type::Void => String::from("void"),
-            Type::Never => String::from("never"),
             Type::Unknown => String::from("unknown"),
             Type::Null => String::from("null"),
+            Type::Pointer(to) => {
+                format!("*{}", self.to_string_recursive(to, visited_set))
+            }
+            Type::MutPointer(to) => {
+                format!("*mut {}", self.to_string_recursive(to, visited_set))
+            }
+            Type::TaglessUnion(btree_set) => {
+                self.union_variants_to_string(&btree_set, visited_set)
+            }
         };
 
         visited_set.remove(&target);
@@ -530,24 +362,12 @@ impl TypeInterner {
         &self,
         variants: &BTreeSet<TypeId>,
         visited_set: &mut HashSet<TypeId>,
-        is_tagged: bool,
     ) -> String {
-        let symbol = if is_tagged { "|" } else { "~" };
-
         variants
             .iter()
             .map(|tag| self.to_string_recursive(*tag, visited_set))
             .collect::<Vec<String>>()
-            .join(symbol)
-    }
-
-    pub fn list_to_string(
-        &self,
-        item_type: TypeId,
-        visited_set: &mut HashSet<TypeId>,
-    ) -> String {
-        let item_type_string = self.to_string_recursive(item_type, visited_set);
-        format!("{}[]", item_type_string)
+            .join(" or ")
     }
 
     fn fn_signature_to_string(
