@@ -22,7 +22,7 @@ fn prefix_bp(token_kind: &TokenKind) -> Option<((), u8)> {
     use TokenKind::*;
 
     let priority = match token_kind {
-        Punctuation(Minus) | Punctuation(Not) => ((), 13),
+        Punctuation(Minus) | Punctuation(Not) | Punctuation(And) => ((), 13),
         _ => return None,
     };
 
@@ -72,6 +72,7 @@ pub fn is_start_of_expr(token_kind: &TokenKind) -> bool {
         | TokenKind::Keyword(KeywordKind::False)
         | TokenKind::Keyword(KeywordKind::If)
         | TokenKind::Keyword(KeywordKind::Null)
+        | TokenKind::Punctuation(PunctuationKind::And)      // Address of
         | TokenKind::Punctuation(PunctuationKind::LParen)   // Parenthesized expr
         | TokenKind::Punctuation(PunctuationKind::LBrace)   // Codeblock or Struct expr
         | TokenKind::Punctuation(PunctuationKind::Minus)    // Negation
@@ -89,6 +90,30 @@ impl Parser {
         let token_span = token.span.clone();
 
         let mut lhs = match token.kind {
+             TokenKind::Punctuation(PunctuationKind::And) => {
+                let ((), r_bp) = prefix_bp(&TokenKind::Punctuation(PunctuationKind::And))
+                    .expect("INTERNAL COMPILER ERROR: expected '&' to have prefix binding power");
+                
+                let start_offset = self.offset;
+                self.consume_punctuation(PunctuationKind::And)?;
+                
+                let is_mut = if self.match_token(0, TokenKind::Keyword(KeywordKind::Mut)) {
+                    self.consume_keyword(KeywordKind::Mut)?;
+                    true
+                } else {
+                    false
+                };
+
+                let expr = self.parse_expr(r_bp)?;
+                
+                Expr {
+                    kind: ExprKind::AddressOf {
+                        is_mut,
+                        right: Box::new(expr),
+                    },
+                    span: self.get_span(start_offset, self.offset - 1)?,
+                }
+            }
             TokenKind::Keyword(KeywordKind::SelfValue) => {
                 let span = self.consume_keyword(KeywordKind::SelfValue)?;
                 Expr {

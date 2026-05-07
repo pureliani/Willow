@@ -3,11 +3,26 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     ast::{type_annotation::TypeAnnotation, DeclarationId, IdentifierNode, Span},
     compile::interner::StringId,
-    tokenize::NumberKind,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MemoryId(pub usize);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct AllocationId(pub usize);
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AccessKind {
+    Field(usize),
+    Index(InstrId),
+    Deref,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct MemoryLocation {
+    pub base: AllocationId,
+    pub projections: Vec<AccessKind>,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BasicBlockId(pub usize);
@@ -55,28 +70,17 @@ pub struct CastInstr {
     pub target: TypeAnnotation,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Place {
-    Var(DeclarationId),
-    Field(Box<Place>, IdentifierNode),
-    Index(Box<Place>, InstrId),
-    Deref(Box<Place>),
-    Expr(InstrId),
-}
-
 #[derive(Clone, Debug)]
 pub enum MemoryInstr {
     StackAlloc {
+        id: AllocationId,
         ty: TypeAnnotation,
         count: usize,
     },
     HeapAlloc {
+        id: AllocationId,
         ty: TypeAnnotation,
         count: InstrId,
-    },
-    PtrOffset {
-        base_ptr: InstrId,
-        index: InstrId,
     },
     HeapFree {
         ptr: InstrId,
@@ -89,12 +93,16 @@ pub enum MemoryInstr {
         memory_in: MemoryId,
         memory_out: MemoryId,
     },
-    ReadPlace {
-        place: Place,
+    ProjectPtr {
+        base_ptr: InstrId,
+        access: AccessKind,
+    },
+    Load {
+        ptr: InstrId,
         memory_in: MemoryId,
     },
-    WritePlace {
-        place: Place,
+    Store {
+        ptr: InstrId,
         value: InstrId,
         memory_in: MemoryId,
         memory_out: MemoryId,
@@ -135,8 +143,6 @@ pub struct MemoryPhiSource {
 
 #[derive(Clone, Debug)]
 pub enum MakeLiteralKind {
-    Number(NumberKind),
-    Bool(bool),
     String(StringId),
     Fn(DeclarationId),
     Null,
@@ -149,11 +155,6 @@ pub enum MakeLiteralKind {
 pub struct StructInitInstr {
     pub fields: Vec<(IdentifierNode, InstrId)>,
     pub by_value: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct ListInitInstr {
-    pub items: Vec<InstrId>,
 }
 
 #[derive(Clone, Debug)]
@@ -177,7 +178,6 @@ pub struct CallBuiltinInstr {
 
 #[derive(Clone, Debug)]
 pub enum InstructionKind {
-    MakeLiteral(MakeLiteralKind),
     Unary(UnaryInstr),
     Binary(BinaryInstr),
     Cast(CastInstr),
@@ -187,7 +187,6 @@ pub enum InstructionKind {
     Phi(PhiInstr),
     Param(usize),
     StructInit(StructInitInstr),
-    ListInit(ListInitInstr),
     GenericApply(GenericApplyInstr),
     CallBuiltin(CallBuiltinInstr),
 }

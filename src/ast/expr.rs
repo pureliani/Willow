@@ -73,6 +73,10 @@ pub enum ExprKind {
         left: Box<Expr>,
         right: Box<Expr>,
     },
+    AddressOf {
+        is_mut: bool,
+        right: Box<Expr>,
+    },
     Struct(Vec<(IdentifierNode, Expr)>),
     Access {
         left: Box<Expr>,
