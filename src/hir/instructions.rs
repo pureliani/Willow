@@ -3,13 +3,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     ast::{type_annotation::TypeAnnotation, DeclarationId, IdentifierNode, Span},
     compile::interner::StringId,
+    tokenize::NumberKind,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MemoryId(pub usize);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AllocationId(pub usize);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ArenaId(pub usize);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AccessKind {
@@ -51,7 +55,7 @@ pub enum UnaryOpKind {
     Not,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PhiSource {
     pub block: BasicBlockId,
     pub value: InstrId,
@@ -70,12 +74,13 @@ pub enum BuiltinFunction {
 
 #[derive(Clone, Debug)]
 pub enum InstructionKind {
+    ConstNumber(NumberKind),
+    ConstBool(bool),
+    ConstString(StringId),
     ConstFn(DeclarationId),
     ConstNull,
     ConstVoid,
     ConstUnknown,
-    ConstString(StringId),
-
     Unary {
         value: InstrId,
         op: UnaryOpKind,
@@ -85,27 +90,25 @@ pub enum InstructionKind {
         rhs: InstrId,
         op: BinaryOpKind,
     },
-    // Memory
-    StackAlloc {
-        id: AllocationId,
+    ExtractField {
+        base_val: InstrId,
+        field_idx: usize,
+    },
+    InsertField {
+        base_val: InstrId,
+        field_idx: usize,
+        new_val: InstrId,
+    },
+    CreateArena {
+        arena_id: ArenaId,
+    },
+    FreeArena {
+        arena_id: ArenaId,
+    },
+    Alloc {
+        alloc_id: AllocationId,
+        arena_id: Option<ArenaId>,
         ty: TypeAnnotation,
-        count: usize,
-    },
-    HeapAlloc {
-        id: AllocationId,
-        ty: TypeAnnotation,
-        count: InstrId,
-    },
-    HeapFree {
-        ptr: InstrId,
-        memory_in: MemoryId,
-        memory_out: MemoryId,
-    },
-    MemCopy {
-        from: InstrId,
-        to: InstrId,
-        memory_in: MemoryId,
-        memory_out: MemoryId,
     },
     ProjectPtr {
         base_ptr: InstrId,
@@ -121,31 +124,32 @@ pub enum InstructionKind {
         memory_in: MemoryId,
         memory_out: MemoryId,
     },
-
+    MemCopy {
+        from: InstrId,
+        to: InstrId,
+        memory_in: MemoryId,
+        memory_out: MemoryId,
+    },
     Call {
         func: InstrId,
         args: Vec<InstrId>,
         memory_in: MemoryId,
         memory_out: MemoryId,
     },
-
     CallBuiltin {
         builtin: BuiltinFunction,
         args: Vec<InstrId>,
         memory_in: MemoryId,
         memory_out: MemoryId,
     },
-
     Select {
         cond: InstrId,
         true_val: InstrId,
         false_val: InstrId,
     },
-
     Phi {
         sources: BTreeSet<PhiSource>,
     },
-
     Param(usize),
     StructInit {
         fields: Vec<(IdentifierNode, InstrId)>,
@@ -201,6 +205,7 @@ pub struct FunctionCFG {
 
     next_block_id: usize,
     next_memory_id: usize,
+    next_alloc_id: usize,
 }
 
 impl FunctionCFG {
@@ -211,6 +216,7 @@ impl FunctionCFG {
             instructions: Vec::new(),
             next_block_id: 0,
             next_memory_id: 1,
+            next_alloc_id: 0,
         };
 
         cfg.entry_block = cfg.new_block();
