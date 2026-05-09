@@ -46,32 +46,46 @@ pub enum BinaryOpKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct BinaryInstr {
-    pub lhs: InstrId,
-    pub rhs: InstrId,
-    pub op: BinaryOpKind,
-}
-
-#[derive(Clone, Debug)]
 pub enum UnaryOpKind {
     Neg,
     Not,
 }
 
 #[derive(Clone, Debug)]
-pub struct UnaryInstr {
+pub struct PhiSource {
+    pub block: BasicBlockId,
     pub value: InstrId,
-    pub op: UnaryOpKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MemoryPhiSource {
+    pub block: BasicBlockId,
+    pub memory: MemoryId,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuiltinFunction {
+    StringConcat,
 }
 
 #[derive(Clone, Debug)]
-pub struct CastInstr {
-    pub src: InstrId,
-    pub target: TypeAnnotation,
-}
+pub enum InstructionKind {
+    ConstFn(DeclarationId),
+    ConstNull,
+    ConstVoid,
+    ConstUnknown,
+    ConstString(StringId),
 
-#[derive(Clone, Debug)]
-pub enum MemoryInstr {
+    Unary {
+        value: InstrId,
+        op: UnaryOpKind,
+    },
+    Binary {
+        lhs: InstrId,
+        rhs: InstrId,
+        op: BinaryOpKind,
+    },
+    // Memory
     StackAlloc {
         id: AllocationId,
         ty: TypeAnnotation,
@@ -107,88 +121,43 @@ pub enum MemoryInstr {
         memory_in: MemoryId,
         memory_out: MemoryId,
     },
-}
 
-#[derive(Clone, Debug)]
-pub struct CallInstr {
-    pub func: InstrId,
-    pub args: Vec<InstrId>,
-    pub memory_in: MemoryId,
-    pub memory_out: MemoryId,
-}
+    Call {
+        func: InstrId,
+        args: Vec<InstrId>,
+        memory_in: MemoryId,
+        memory_out: MemoryId,
+    },
 
-#[derive(Clone, Debug)]
-pub struct SelectInstr {
-    pub cond: InstrId,
-    pub true_val: InstrId,
-    pub false_val: InstrId,
-}
+    CallBuiltin {
+        builtin: BuiltinFunction,
+        args: Vec<InstrId>,
+        memory_in: MemoryId,
+        memory_out: MemoryId,
+    },
 
-#[derive(Clone, Debug)]
-pub struct PhiSource {
-    pub block: BasicBlockId,
-    pub value: InstrId,
-}
+    Select {
+        cond: InstrId,
+        true_val: InstrId,
+        false_val: InstrId,
+    },
 
-#[derive(Clone, Debug)]
-pub struct PhiInstr {
-    pub sources: Vec<PhiSource>,
-}
+    Phi {
+        sources: BTreeSet<PhiSource>,
+    },
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct MemoryPhiSource {
-    pub block: BasicBlockId,
-    pub memory: MemoryId,
-}
-
-#[derive(Clone, Debug)]
-pub enum MakeLiteralKind {
-    String(StringId),
-    Fn(DeclarationId),
-    Null,
-    Void,
-    Unknown,
-    Never,
-}
-
-#[derive(Clone, Debug)]
-pub struct StructInitInstr {
-    pub fields: Vec<(IdentifierNode, InstrId)>,
-    pub by_value: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct GenericApplyInstr {
-    pub func: InstrId,
-    pub type_args: Vec<TypeAnnotation>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BuiltinFunction {
-    StringConcat,
-}
-
-#[derive(Clone, Debug)]
-pub struct CallBuiltinInstr {
-    pub builtin: BuiltinFunction,
-    pub args: Vec<InstrId>,
-    pub memory_in: MemoryId,
-    pub memory_out: MemoryId,
-}
-
-#[derive(Clone, Debug)]
-pub enum InstructionKind {
-    Unary(UnaryInstr),
-    Binary(BinaryInstr),
-    Cast(CastInstr),
-    Memory(MemoryInstr),
-    Call(CallInstr),
-    Select(SelectInstr),
-    Phi(PhiInstr),
     Param(usize),
-    StructInit(StructInitInstr),
-    GenericApply(GenericApplyInstr),
-    CallBuiltin(CallBuiltinInstr),
+    StructInit {
+        fields: Vec<(IdentifierNode, InstrId)>,
+    },
+    GenericApply {
+        func: InstrId,
+        type_args: Vec<TypeAnnotation>,
+    },
+    Cast {
+        src: InstrId,
+        target: TypeAnnotation,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -278,7 +247,7 @@ impl FunctionCFG {
 
         self.check_no_terminator(block_id);
 
-        if matches!(instr.kind, InstructionKind::Phi(_)) {
+        if matches!(instr.kind, InstructionKind::Phi { .. }) {
             self.validate_phi_push(block_id);
         }
 
@@ -331,7 +300,7 @@ impl FunctionCFG {
 
         for &instr_id in &block.instructions {
             let instr = self.get_instr(instr_id);
-            if !matches!(instr.kind, InstructionKind::Phi(_)) {
+            if !matches!(instr.kind, InstructionKind::Phi { .. }) {
                 panic!("INTERNAL COMPILER ERROR: Phi instructions must be emitted first");
             }
         }
